@@ -1,17 +1,17 @@
 const express = require("express");
 const http = require("http");
 const { Server } = require("socket.io");
+const path = require("path");
 
-// Initialize Express and Socket.IO
 const app = express();
 const server = http.createServer(app);
 const io = new Server(server);
 
-// Serve static files (like index.html) from the current directory
-app.use(express.static(__dirname));
+// Serve static files from the "public" directory
+app.use(express.static(path.join(__dirname, "public")));
 
 // Start the server
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
@@ -115,30 +115,31 @@ io.on("connection", (socket) => {
       clearInterval(timerInterval); // Stop the timer
     }
   });
+});
 
-  // Function to start the timer
-  function startTimer() {
-    let timeRemaining = 30; // 30 seconds
+// Function to start the timer
+function startTimer() {
+  let timeRemaining = 30; // 30 seconds
 
-    // Emit the initial timer value to all clients
+  // Emit the initial timer value to all clients
+  io.emit("update_timer", timeRemaining);
+
+  // Start the countdown
+  timerInterval = setInterval(() => {
+    timeRemaining--;
+
+    // Emit the updated timer value to all clients
     io.emit("update_timer", timeRemaining);
 
-    // Start the countdown
-    timerInterval = setInterval(() => {
-      timeRemaining--;
+    // Handle timeout
+    if (timeRemaining <= 0) {
+      clearInterval(timerInterval); // Stop the timer
+      handleTimeout();
+    }
+  }, 1000); // Update every second
+}
 
-      // Emit the updated timer value to all clients
-      io.emit("update_timer", timeRemaining);
-
-      // Handle timeout
-      if (timeRemaining <= 0) {
-        clearInterval(timerInterval); // Stop the timer
-        handleTimeout();
-      }
-    }, 1000); // Update every second
-  }
-
-  // Function to handle timeout
+// Function to handle timeout
 function handleTimeout() {
   const [p1Id, p2Id] = playerSlots;
   const p1 = players[p1Id];
@@ -176,105 +177,110 @@ function handleTimeout() {
   startTimer();
 }
 
-  // Function to calculate round winner with proper zero-sum logic and "300% rule"
-  function calculateRoundWinner(player1Id, player2Id) {
-    const p1 = players[player1Id];
-    const p2 = players[player2Id];
+// Function to calculate round winner with proper zero-sum logic and "300% rule"
+function calculateRoundWinner(player1Id, player2Id) {
+  const p1 = players[player1Id];
+  const p2 = players[player2Id];
 
-    let winner;
+  let winner;
 
-    // Increment the round number
-    roundNumber++;
+  // Increment the round number
+  roundNumber++;
 
-    let logEntry;
+  let logEntry;
 
-    if (p1.wager === p2.wager) {
-      // Handle draw case
-      logEntry = `Round ${roundNumber}: ${p1.name} and ${p2.name} both wagered ${p1.wager} units. It's a draw!`;
-      console.log(logEntry);
-      io.emit("update_game_log", logEntry);
-
-      // Emit round_result for draw case
-      io.emit("round_result", {
-        winner: null, // No winner in a draw
-        units: { [player1Id]: p1.units, [player2Id]: p2.units },
-        isDraw: true, // Indicate that this is a draw
-      });
-
-      // Reset wagers for both players after the round ends
-      p1.wager = null;
-      p2.wager = null;
-      return;
-    }
-
-    let logNote = "";
-
-    // Apply the 300% rule
-    if (p1.wager > p2.wager * 3) {
-      winner = p2; // Lower wager wins due to the 300% rule
-      logNote = " due to the '300% rule'";
-      p2.units += p1.wager;
-      p1.units -= p1.wager;
-    } else if (p2.wager > p1.wager * 3) {
-      winner = p1; // Lower wager wins due to the 300% rule
-      logNote = " due to the '300% rule'";
-      p1.units += p2.wager;
-      p2.units -= p2.wager;
-    } else {
-      // Standard rule: higher wager wins
-      if (p1.wager > p2.wager) {
-        winner = p1;
-        p1.units += p2.wager;
-        p2.units -= p2.wager;
-      } else {
-        winner = p2;
-        p2.units += p1.wager;
-        p1.units -= p1.wager;
-      }
-    }
-
-    logEntry =
-      `Round ${roundNumber}: ${p1.name} wagers ${p1.wager} units, ` +
-      `${p2.name} wagers ${p2.wager} units. ${winner.name} wins${logNote}!`;
-
+  if (p1.wager === p2.wager) {
+    // Handle draw case
+    logEntry = `Round ${roundNumber}: ${p1.name} and ${p2.name} both wagered ${p1.wager} units. It's a draw!`;
+    console.log(logEntry);
     io.emit("update_game_log", logEntry);
 
+    // Emit round_result for draw case
     io.emit("round_result", {
-      winner: winner.name,
+      winner: null, // No winner in a draw
       units: { [player1Id]: p1.units, [player2Id]: p2.units },
-      isDraw: false, // Indicate that this is not a draw
+      isDraw: true, // Indicate that this is a draw
     });
 
     // Reset wagers for both players after the round ends
     p1.wager = null;
     p2.wager = null;
+    return;
+  }
 
-    // Check for end-game conditions
-    if (p1.units < 20 || p2.units < 20) {
-      const winner = p1.units >= 20 ? p1 : p2; // Determine who has >= 20 units
-      io.emit("game_over", { winnerId: winner === p1 ? player1Id : player2Id });
-      console.log(`Game over! Winner: ${winner.name}`);
+  let logNote = "";
+
+  // Apply the 300% rule
+  if (p1.wager > p2.wager * 3) {
+    winner = p2; // Lower wager wins due to the 300% rule
+    logNote = " due to the '300% rule'";
+    p2.units += p1.wager;
+    p1.units -= p1.wager;
+  } else if (p2.wager > p1.wager * 3) {
+    winner = p1; // Lower wager wins due to the 300% rule
+    logNote = " due to the '300% rule'";
+    p1.units += p2.wager;
+    p2.units -= p2.wager;
+  } else {
+    // Standard rule: higher wager wins
+    if (p1.wager > p2.wager) {
+      winner = p1;
+      p1.units += p2.wager;
+      p2.units -= p2.wager;
+    } else {
+      winner = p2;
+      p2.units += p1.wager;
+      p1.units -= p1.wager;
     }
+  }
 
+  logEntry =
+    `Round ${roundNumber}: ${p1.name} wagers ${p1.wager} units, ` +
+    `${p2.name} wagers ${p2.wager} units. ${winner.name} wins${logNote}!`;
+
+  io.emit("update_game_log", logEntry);
+
+  io.emit("round_result", {
+    winner: winner.name,
+    units: { [player1Id]: p1.units, [player2Id]: p2.units },
+    isDraw: false, // Indicate that this is not a draw
+  });
+
+  // Reset wagers for both players after the round ends
+  p1.wager = null;
+  p2.wager = null;
+
+  // Check for end-game conditions
+  if (p1.units < 20 || p2.units < 20) {
+    const winner = p1.units >= 20 ? p1 : p2; // Determine who has >= 20 units
+    io.emit("game_over", { winnerId: winner === p1 ? player1Id : player2Id });
+    console.log(`Game over! Winner: ${winner.name}`);
+
+    // Stop the timer when the game ends
+    clearInterval(timerInterval);
+  } else {
     // Start the next round
     startTimer();
   }
+}
 
-  // Listen for reset_game event from clients
-  socket.on("reset_game", () => {
-    console.log("Resetting game...");
+// Listen for reset_game event from clients
+socket.on("reset_game", () => {
+  console.log("Resetting game...");
 
-    // Reset all players' data
-    Object.keys(players).forEach((id) => {
-      players[id].units = 200; // Reset units to initial value
-      players[id].wager = null; // Clear wagers
-    });
-
-    roundNumber = 0; // Reset round number
-
-    // Notify clients that the game has been reset
-    io.emit("game_reset");
-
-    console.log("Game reset successfully!");
+  // Reset all players' data
+  Object.keys(players).forEach((id) => {
+    players[id].units = 200; // Reset units to initial value
+    players[id].wager = null; // Clear wagers
   });
+
+  roundNumber = 0; // Reset round number
+
+  // Notify clients that the game has been reset
+  io.emit("game_reset");
+
+  // Start the timer for the new round
+  startTimer();
+
+  console.log("Game reset successfully!");
 });

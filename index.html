@@ -253,31 +253,31 @@ socket.on("round_result", (data) => {
     });
 
     // Reset game state on Play Again button click
-    function playAgain() {
-      socket.emit("reset_game"); // Notify server to reset the game
+    // Function to reset game state on Play Again button click
+function playAgain() {
+  socket.emit("reset_game"); // Notify server to reset the game
 
-      // Reset UI elements
-      document.getElementById("game-log").innerHTML = "";
-      document.getElementById("player-units").innerText = "200";
-      document.getElementById("opponent-units").innerText = "200";
-      document.getElementById("player-bar").style.width = "50%";
-      document.getElementById("player-bar").style.backgroundColor = "blue"; // Reset to blue
-      document.getElementById("game-over-message").style.display = "none";
-      document.getElementById("play-again-button").style.display = "none";
+  // Reset UI elements
+  document.getElementById("game-log").innerHTML = "";
+  document.getElementById("player-units").innerText = "200";
+  document.getElementById("opponent-units").innerText = "200";
+  document.getElementById("player-bar").style.width = "50%";
+  document.getElementById("game-over-message").style.display = "none";
+  document.getElementById("play-again-button").style.display = "none";
 
-      // Reset wager limits
-      minWager = 10;
-      maxWager = 200;
-      document.getElementById("wager-limits").innerText =
-        "Minimum wager: 10 units. Maximum wager: 200 units.";
+  // Reset wager limits
+  minWager = 10;
+  maxWager = 200;
+  document.getElementById("wager-limits").innerText =
+    "Minimum wager: 10 units. Maximum wager: 200 units.";
 
-      // Re-enable the wager input field and button
-      document.getElementById("wager").disabled = false;
-      document.querySelector("button").disabled = false;
+  // Re-enable the wager input field and button
+  document.getElementById("wager").disabled = false;
+  document.querySelector("button").disabled = false;
 
-      // Clear the wager confirmation message
-      document.getElementById("wager-confirmation").innerText = "";
-    }
+  // Clear the wager confirmation message
+  document.getElementById("wager-confirmation").innerText = "";
+}
 
     // Update the Game Log when a new log entry is received
     socket.on("update_game_log", (logEntry) => {
