@@ -1,0 +1,312 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Greedy Game</title>
+  <style>
+    /* Style for the status bar */
+    .status-container {
+      display: flex;
+      align-items: center;
+      margin-bottom: 10px;
+    }
+    .status-label {
+      width: 50px;
+      text-align: right;
+      margin-right: 10px;
+    }
+    .status-bar {
+      width: 400px;
+      height: 20px;
+      background-color: #ddd;
+      position: relative;
+    }
+    .status-fill {
+      height: 100%;
+      background-color: blue; /* Default color */
+      transition: width 0.5s ease, background-color 0.5s ease; /* Smooth transitions */
+    }
+    /* Vertical line at the 20-unit mark (5% of the status bar) */
+    .status-bar::before {
+      content: "";
+      position: absolute;
+      left: 5%; /* Position at 5% from the left */
+      top: 0;
+      bottom: 0;
+      width: 2px;
+      background-color: rgba(0, 0, 0, 0.3); /* Faint vertical line */
+    }
+    .opponent-units {
+      margin-left: 10px;
+      font-weight: bold;
+    }
+    /* Style for Game Over messages */
+    #game-over-message {
+      display: none; /* Hidden by default */
+      text-align: center;
+      margin-top: 20px;
+    }
+    #game-over-message h2 {
+      margin-bottom: 10px;
+    }
+    #play-again-button {
+      display: none; /* Hidden by default */
+      padding: 10px 20px;
+      background-color: green;
+      color: white;
+      border: none;
+      cursor: pointer;
+      font-size: 16px;
+    }
+    #play-again-button:hover {
+      background-color: darkgreen;
+    }
+    /* Style for the Game Log */
+    #game-log {
+      max-height: 200px;
+      overflow-y: auto;
+      border: 1px solid #ccc;
+      padding: 10px;
+      margin-top: 20px;
+    }
+    #game-log p {
+      margin: 5px 0; /* Add some spacing between log entries */
+    }
+    /* Style for wager limits */
+    #wager-limits {
+      margin-top: 10px;
+      font-style: italic;
+      color: #666;
+    }
+    /* Style for wager confirmation message */
+    #wager-confirmation {
+      margin-top: 10px;
+      font-style: italic;
+      color: #4caf50; /* Green for confirmation */
+    }
+    /* Style for the timer */
+    #timer {
+      font-size: 24px;
+      font-weight: bold;
+      margin-top: 10px;
+      color: black; /* Default color */
+    }
+    #timer.red {
+      color: red; /* Red color for final 5 seconds */
+    }
+  </style>
+</head>
+<body>
+  <h1>GREEDY!</h1>
+
+  <!-- Status bar for the current player -->
+  <div class="status-container">
+    <div class="status-label" id="player-units">200</div>
+    <div class="status-bar">
+      <div class="status-fill" id="player-bar" style="width: 50%;"></div>
+    </div>
+    <div class="opponent-units" id="opponent-units">200</div>
+  </div>
+
+  <!-- Input field and button for placing wagers -->
+  <h3 id="player-name">Connecting...</h3>
+  <input type="number" id="wager" placeholder="Enter your wager" />
+  <button onclick="placeWager()">Place Wager</button>
+
+  <!-- Display wager limits -->
+  <div id="wager-limits">Minimum wager: 10 units. Maximum wager: 200 units.</div>
+
+  <!-- Display wager confirmation message -->
+  <div id="wager-confirmation"></div>
+
+  <!-- Timer display -->
+  <div id="timer">30</div>
+
+  <!-- Game Log -->
+  <h3>Game Log:</h3>
+  <div id="game-log"></div>
+
+  <!-- Game Over Message -->
+  <div id="game-over-message">
+    <h2 id="end-message"></h2>
+    <button id="play-again-button" onclick="playAgain()">Press me to play again!</button>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    // Variables to track player and opponent IDs
+    const socket = io();
+    let playerId = null; // This player's ID
+    let opponentId = null; // Opponent's ID
+    let minWager = 10; // Minimum wager
+    let maxWager = 200; // Maximum wager
+
+    // Function to calculate the status bar color based on units
+    function calculateStatusBarColor(units) {
+      if (units <= 200) {
+        // Transition from blue to red (0 to 200 units)
+        const red = Math.floor((1 - units / 200) * 255);
+        const green = 0;
+        const blue = Math.floor((units / 200) * 255);
+        return `rgb(${red}, ${green}, ${blue})`;
+      } else {
+        // Transition from blue to green (200 to 400 units)
+        const red = 0;
+        const green = Math.floor(((units - 200) / 200) * 255);
+        const blue = Math.floor((1 - (units - 200) / 200) * 255);
+        return `rgb(${red}, ${green}, ${blue})`;
+      }
+    }
+
+    // Display connection status
+    socket.on("connect", () => {
+      document.getElementById("player-name").innerText = "Connected to server! Waiting for assignment...";
+    });
+
+    socket.on("disconnect", () => {
+      document.getElementById("player-name").innerText = "Disconnected from server. Reconnecting...";
+    });
+
+    // Assign player's name and ID when received from the server
+    socket.on("assign_name", (data) => {
+      document.getElementById("player-name").innerText = `You are ${data.name}`;
+      playerId = data.id; // Store this player's ID
+    });
+
+    // Update the status bar and unit counts after each round
+socket.on("round_result", (data) => {
+  const allPlayers = Object.keys(data.units);
+
+  // Determine opponent's ID
+  opponentId = allPlayers.find(id => id !== playerId);
+
+  // Get unit counts for both players
+  const playerUnits = data.units[playerId];
+  const opponentUnits = data.units[opponentId];
+
+  // Update this player's unit count and status bar
+  document.getElementById("player-units").innerText = playerUnits || "0";
+  const playerBarWidth = (playerUnits / 400) * 100; // Calculate percentage
+  document.getElementById("player-bar").style.width = `${playerBarWidth}%`;
+
+  // Update the status bar color
+  const statusBarColor = calculateStatusBarColor(playerUnits);
+  document.getElementById("player-bar").style.backgroundColor = statusBarColor;
+
+  // Update opponent's unit count
+  document.getElementById("opponent-units").innerText = opponentUnits || "0";
+
+  // Update wager limits
+  minWager = 10;
+  maxWager = playerUnits;
+  document.getElementById("wager-limits").innerText =
+    `Minimum wager: ${minWager} units. Maximum wager: ${maxWager} units.`;
+
+  // Clear the wager input field after the round ends
+  document.getElementById("wager").value = "";
+
+  // Re-enable the wager input field and button
+  document.getElementById("wager").disabled = false;
+  document.querySelector("button").disabled = false;
+
+  // Clear the wager confirmation message
+  document.getElementById("wager-confirmation").innerText = "";
+
+  // Handle draw case
+  if (data.isDraw) {
+    const gameLog = document.getElementById("game-log");
+    const logItem = document.createElement("p");
+    logItem.innerText = `Round ended in a draw!`;
+    gameLog.prepend(logItem);
+  }
+});
+
+    // Update the timer display
+    socket.on("update_timer", (timeRemaining) => {
+      const timerElement = document.getElementById("timer");
+      timerElement.innerText = timeRemaining;
+
+      // Change the timer text color to red for the final 5 seconds
+      if (timeRemaining <= 5) {
+        timerElement.classList.add("red");
+      } else {
+        timerElement.classList.remove("red");
+      }
+    });
+
+    // Display game over message when received from the server
+    socket.on("game_over", (data) => {
+      const endMessage = document.getElementById("end-message");
+
+      if (data.winnerId === playerId) {
+        endMessage.innerText = "Congratulations, you won!";
+        endMessage.style.color = "green";
+      } else {
+        endMessage.innerText = "Game over, you lost.";
+        endMessage.style.color = "red";
+      }
+
+      // Show game over message and play again button
+      document.getElementById("game-over-message").style.display = "block";
+      document.getElementById("play-again-button").style.display = "inline-block";
+    });
+
+    // Reset game state on Play Again button click
+    function playAgain() {
+      socket.emit("reset_game"); // Notify server to reset the game
+
+      // Reset UI elements
+      document.getElementById("game-log").innerHTML = "";
+      document.getElementById("player-units").innerText = "200";
+      document.getElementById("opponent-units").innerText = "200";
+      document.getElementById("player-bar").style.width = "50%";
+      document.getElementById("player-bar").style.backgroundColor = "blue"; // Reset to blue
+      document.getElementById("game-over-message").style.display = "none";
+      document.getElementById("play-again-button").style.display = "none";
+
+      // Reset wager limits
+      minWager = 10;
+      maxWager = 200;
+      document.getElementById("wager-limits").innerText =
+        "Minimum wager: 10 units. Maximum wager: 200 units.";
+
+      // Re-enable the wager input field and button
+      document.getElementById("wager").disabled = false;
+      document.querySelector("button").disabled = false;
+
+      // Clear the wager confirmation message
+      document.getElementById("wager-confirmation").innerText = "";
+    }
+
+    // Update the Game Log when a new log entry is received
+    socket.on("update_game_log", (logEntry) => {
+      const gameLog = document.getElementById("game-log");
+      const logItem = document.createElement("p");
+      logItem.innerText = logEntry;
+      gameLog.prepend(logItem);
+    });
+
+    // Function to place a wager
+    function placeWager() {
+      const wagerInput = document.getElementById("wager").value;
+      const wager = parseInt(wagerInput);
+
+      if (isNaN(wager) || wager < minWager || wager > maxWager) {
+        alert(`Your wager must be between ${minWager} and ${maxWager} units.`);
+        return;
+      }
+
+      // Disable the wager input field and button
+      document.getElementById("wager").disabled = true;
+      document.querySelector("button").disabled = true;
+
+      // Display confirmation message
+      document.getElementById("wager-confirmation").innerText = `Your ${wager} unit wager is locked in!`;
+
+      // Send the wager to the server
+      socket.emit("place_wager", wager);
+    }
+  </script>
+</body>
+</html>
