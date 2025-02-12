@@ -1,4 +1,3 @@
-// server.js
 require("dotenv").config(); // Load environment variables
 
 const express = require("express");
@@ -8,10 +7,10 @@ const { Server } = require("socket.io");
 const app = express();
 const server = http.createServer(app);
 
-// Configure CORS
+// Configure CORS to allow connections from Render and localhost
 const io = new Server(server, {
   cors: {
-    origin: process.env.CLIENT_URL || "http://localhost:3000", // Use environment variable
+    origin: [process.env.CLIENT_URL || "http://localhost:3000", "https://greedy-game.onrender.com"], // Add your Render app URL here
     methods: ["GET", "POST"],
   },
 });
@@ -23,6 +22,10 @@ app.use(express.static(__dirname + "/public"));
 const PORT = process.env.PORT || 3000; // Use Render's port or default to 3000
 server.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
+});
+
+app.get('/', (req, res) => {
+  res.send('Hello World!');
 });
 
 // Game state
