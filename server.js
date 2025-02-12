@@ -19,6 +19,12 @@ const io = new Server(server, {
 // Serve static files
 app.use(express.static(__dirname + "/public"));
 
+// Start the server
+const PORT = process.env.PORT || 3000; // Use Render's port or default to 3000
+server.listen(PORT, () => {
+  console.log(`Server is running on http://localhost:${PORT}`);
+});
+
 // Game state
 const playerSlots = [null, null]; // Player 1 -> index 0, Player 2 -> index 1
 const players = {}; // Store player data
@@ -27,12 +33,6 @@ let timerInterval = null; // Track the timer interval
 let isGameOver = false; // Track if the game has ended
 let consecutiveDoubleTimeouts = 0; // Track consecutive double timeouts
 const playerReady = new Set(); // Track player readiness
-
-// Start the server
-const PORT = process.env.PORT || 3000; // Use environment variable
-server.listen(PORT, () => {
-  console.log(`Server is running on http://localhost:${PORT}`);
-});
 
 // Helper function to reset the game state
 function resetGameState() {
