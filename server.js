@@ -10,7 +10,7 @@ const server = http.createServer(app);
 // Configure CORS to allow connections from Render and localhost
 const io = new Server(server, {
   cors: {
-    origin: [process.env.CLIENT_URL || "http://localhost:3000", "https://greedy-game.onrender.com"], // Add your Render app URL here
+    origin: [process.env.CLIENT_URL || "http://localhost:3000", "https://greedy-game-2z4z.onrender.com"],
     methods: ["GET", "POST"],
   },
 });
