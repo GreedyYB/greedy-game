@@ -247,7 +247,10 @@
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
-    const socket = io("http://localhost:3000"); // Replace with your server URL
+    // Use Render server URL in production, localhost in development
+    const serverUrl = window.location.hostname === "localhost" ? "http://localhost:3000" : "https://your-render-app-url.onrender.com";
+    const socket = io(serverUrl);
+
     let playerId = null; // This player's ID
     let opponentId = null; // Opponent's ID
     let minWager = 10; // Minimum wager
@@ -306,6 +309,12 @@
     socket.on("disable_wager_input", () => {
       document.getElementById("wager").disabled = true;
       document.querySelector("button").disabled = true;
+    });
+
+    // Handle enable_wager_input event
+    socket.on("enable_wager_input", () => {
+      document.getElementById("wager").disabled = false;
+      document.querySelector("button").disabled = false;
     });
 
     // Handle update_timer event
@@ -381,12 +390,6 @@
       document.getElementById("player-bar").style.backgroundColor = "blue";
       document.getElementById("game-over-message").style.display = "none";
       document.getElementById("play-again-button").style.display = "none";
-
-      // Handle enable_wager_input event
-socket.on("enable_wager_input", () => {
-  document.getElementById("wager").disabled = false;
-  document.querySelector("button").disabled = false;
-});
 
       // Reset wager limits
       minWager = 10;
