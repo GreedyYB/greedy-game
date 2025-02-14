@@ -315,7 +315,7 @@
   <script src="/socket.io/socket.io.js"></script>
   <script>
     // Use Render server URL in production, localhost in development
-    const serverUrl = window.location.hostname === "localhost" ? "http://localhost:3000" : "https://greedy-game-2z4z.onrender.com";
+    const serverUrl = window.location.hostname === "localhost" ? "http://localhost:10000" : "https://greedy-game-2z4z.onrender.com";
     const socket = io(serverUrl);
 
     let playerId = null; // This player's ID
@@ -324,6 +324,15 @@
     let maxWager = 200; // Maximum wager
     let roundNumber = 1; // Track the current round number
     let currentWager = ""; // Track the current wager input
+
+    // Debug: Log connection status
+    socket.on("connect", () => {
+      console.log("Connected to server with socket ID:", socket.id);
+    });
+
+    socket.on("connect_error", (error) => {
+      console.error("Connection error:", error);
+    });
 
     // Function to show the custom keypad
     function showKeypad() {
@@ -368,21 +377,142 @@
         return;
       }
 
+      // Debug: Log the wager being sent
+      console.log("Emitting place_wager event with wager:", wager);
+
+      // Send the wager to the server
+      socket.emit("place_wager", wager);
+
       // Disable the keypad
       hideKeypad();
 
       // Display confirmation message
       document.getElementById("wager-confirmation").innerText = `Your ${wager} unit wager is locked in! Waiting for your opponent.`;
 
-      // Send the wager to the server
-      socket.emit("place_wager", wager);
-
       // Clear the wager input
       currentWager = "";
       updateWagerDisplay();
     }
 
-    // Rest of the existing client-side code remains unchanged...
+    // Handle game_over event
+    socket.on("game_over", (data) => {
+      const endMessage = document.getElementById("end-message");
+      endMessage.innerText = data.endMessage;
+
+      // Show game over message and play again button
+      document.getElementById("game-over-message").style.display = "block";
+      document.getElementById("play-again-button").style.display = "inline-block";
+
+      // Disable wager input and button
+      document.getElementById("wager").disabled = true;
+      document.querySelector("button").disabled = true;
+
+      // Stop the timer at 0
+      document.getElementById("timer").innerText = "0";
+    });
+
+    // Handle disable_wager_input event
+    socket.on("disable_wager_input", () => {
+      document.getElementById("wager").disabled = true;
+      document.querySelector("button").disabled = true;
+    });
+
+    // Handle enable_wager_input event
+    socket.on("enable_wager_input", () => {
+      document.getElementById("wager").disabled = false;
+      document.querySelector("button").disabled = false;
+    });
+
+    // Handle update_timer event
+    socket.on("update_timer", (timeRemaining) => {
+      const timerElement = document.getElementById("timer");
+      timerElement.innerText = timeRemaining;
+
+      // Change the timer text color to red for the final 5 seconds
+      if (timeRemaining <= 5) {
+        timerElement.classList.add("red");
+      } else {
+        timerElement.classList.remove("red");
+      }
+    });
+
+    // Handle round_result event
+    socket.on("round_result", (data) => {
+      const playerUnits = data.units[playerId];
+      const opponentUnits = data.units[opponentId];
+
+      // Update player units and status bar
+      document.getElementById("player-units").innerText = playerUnits || "0";
+      document.getElementById("player-bar").style.width = `${(playerUnits / 400) * 100}%`;
+      document.getElementById("opponent-units").innerText = opponentUnits || "0";
+
+      // Update wager limits
+      minWager = 10;
+      maxWager = playerUnits;
+      document.getElementById("wager-limits").innerText =
+        `Minimum wager: ${minWager} units. Maximum wager: ${maxWager} units.`;
+
+      // Clear the wager input field
+      document.getElementById("wager").value = "";
+
+      // Re-enable the wager input field and button
+      document.getElementById("wager").disabled = false;
+      document.querySelector("button").disabled = false;
+
+      // Clear the wager confirmation message
+      document.getElementById("wager-confirmation").innerText = "";
+
+      // Update round counter
+      roundNumber++;
+      document.getElementById("round-counter").innerText = `Round ${roundNumber}`;
+    });
+
+    // Handle update_game_log event
+    socket.on("update_game_log", (logEntry) => {
+      const gameLog = document.getElementById("game-log");
+      const logItem = document.createElement("p");
+      logItem.innerText = logEntry;
+      gameLog.prepend(logItem);
+    });
+
+    // Handle assign_name event
+    socket.on("assign_name", (data) => {
+      document.getElementById("player-name").innerText = `You are ${data.name}`;
+      playerId = data.id;
+    });
+
+    // Handle opponent_locked_wager event
+    socket.on("opponent_locked_wager", () => {
+      document.getElementById("wager-confirmation").innerText = "Opponent has locked in their wager.";
+    });
+
+    // Handle game_reset_complete event
+    socket.on("game_reset_complete", () => {
+      // Reset UI elements
+      document.getElementById("game-log").innerHTML = "";
+      document.getElementById("player-units").innerText = "200";
+      document.getElementById("opponent-units").innerText = "200";
+      document.getElementById("player-bar").style.width = "50%";
+      document.getElementById("player-bar").style.backgroundColor = "blue";
+      document.getElementById("game-over-message").style.display = "none";
+      document.getElementById("play-again-button").style.display = "none";
+
+      // Reset wager limits
+      minWager = 10;
+      maxWager = 200;
+      document.getElementById("wager-limits").innerText =
+        "Minimum wager: 10 units. Maximum wager: 200 units.";
+
+      // Clear the wager confirmation message
+      document.getElementById("wager-confirmation").innerText = "";
+
+      // Reset round counter
+      roundNumber = 1;
+      document.getElementById("round-counter").innerText = `Round ${roundNumber}`;
+
+      // Reset timer to 60 seconds
+      document.getElementById("timer").innerText = "60";
+    });
   </script>
 </body>
 </html>

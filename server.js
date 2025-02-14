@@ -7,10 +7,10 @@ const { Server } = require("socket.io");
 const app = express();
 const server = http.createServer(app);
 
-// Configure CORS to allow connections from Render and localhost
+// Configure CORS
 const io = new Server(server, {
   cors: {
-    origin: [process.env.CLIENT_URL || "http://localhost:3000", "https://greedy-game-2z4z.onrender.com"],
+    origin: [process.env.CLIENT_URL || "http://localhost:10000", "https://greedy-game-2z4z.onrender.com"], // Allow connections from Render and localhost
     methods: ["GET", "POST"],
   },
 });
@@ -19,7 +19,7 @@ const io = new Server(server, {
 app.use(express.static(__dirname + "/public"));
 
 // Start the server
-const PORT = process.env.PORT || 3000; // Use Render's port or default to 3000
+const PORT = process.env.PORT || 10000; // Use Render's port or default to 10000
 server.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
@@ -92,6 +92,8 @@ io.on("connection", (socket) => {
 
   // Listen for wagers
   socket.on("place_wager", (wager) => {
+    console.log(`Received wager from ${socket.id}:`, wager);
+
     if (isGameOver) {
       socket.emit("error_message", "The game has ended. Please start a new game.");
       return;
