@@ -1,4 +1,4 @@
-require("dotenv").config(); // Load environment variables
+require("dotenv").config();
 
 const express = require("express");
 const http = require("http");
@@ -7,19 +7,16 @@ const { Server } = require("socket.io");
 const app = express();
 const server = http.createServer(app);
 
-// Configure CORS
 const io = new Server(server, {
   cors: {
-    origin: [process.env.CLIENT_URL || "http://localhost:10000", "https://greedy-game-2z4z.onrender.com"], // Allow connections from Render and localhost
+    origin: [process.env.CLIENT_URL || "http://localhost:3000", "https://greedy-game-2z4z.onrender.com"],
     methods: ["GET", "POST"],
   },
 });
 
-// Serve static files
 app.use(express.static(__dirname + "/public"));
 
-// Start the server
-const PORT = process.env.PORT || 10000; // Use Render's port or default to 10000
+const PORT = process.env.PORT || 3000;
 server.listen(PORT, () => {
   console.log(`Server is running on http://localhost:${PORT}`);
 });
@@ -28,16 +25,14 @@ app.get('/', (req, res) => {
   res.send('Hello World!');
 });
 
-// Game state
-const playerSlots = [null, null]; // Player 1 -> index 0, Player 2 -> index 1
-const players = {}; // Store player data
-let roundNumber = 0; // Track the current round number
-let timerInterval = null; // Track the timer interval
-let isGameOver = false; // Track if the game has ended
-let consecutiveDoubleTimeouts = 0; // Track consecutive double timeouts
-const playerReady = new Set(); // Track player readiness
+const playerSlots = [null, null];
+const players = {};
+let roundNumber = 0;
+let timerInterval = null;
+let isGameOver = false;
+let consecutiveDoubleTimeouts = 0;
+const playerReady = new Set();
 
-// Helper function to reset the game state
 function resetGameState() {
   Object.keys(players).forEach((id) => {
     players[id].units = 200;
@@ -51,11 +46,9 @@ function resetGameState() {
   io.emit("game_reset_complete");
 }
 
-// Handle Socket.IO connections
 io.on("connection", (socket) => {
   console.log("A player connected:", socket.id);
 
-  // Assign the player to an available slot
   let assignedSlot = null;
   if (!playerSlots[0]) {
     assignedSlot = 0;
@@ -75,10 +68,8 @@ io.on("connection", (socket) => {
     return;
   }
 
-  // Notify all clients about the new player
   io.emit("player_joined", { id: socket.id, name: players[socket.id].name });
 
-  // Start the game if both players are ready
   if (playerSlots[0] && playerSlots[1]) {
     console.log("Two players are ready. Game can start!");
     io.emit("game_ready", {
@@ -90,10 +81,7 @@ io.on("connection", (socket) => {
     startTimer();
   }
 
-  // Listen for wagers
   socket.on("place_wager", (wager) => {
-    console.log(`Received wager from ${socket.id}:`, wager);
-
     if (isGameOver) {
       socket.emit("error_message", "The game has ended. Please start a new game.");
       return;
@@ -105,7 +93,6 @@ io.on("connection", (socket) => {
       return;
     }
 
-    // Validate wager
     if (wager < 10 || wager > player.units) {
       socket.emit("invalid_wager", `Your wager must be between 10 and ${player.units} units.`);
       return;
@@ -114,13 +101,11 @@ io.on("connection", (socket) => {
     player.wager = wager;
     console.log(`${player.name} placed a wager of ${wager} units.`);
 
-    // Notify the opponent
     const opponentId = playerSlots.find(id => id !== socket.id);
     if (opponentId) {
       io.to(opponentId).emit("opponent_locked_wager");
     }
 
-    // Check if both players have placed wagers
     const [p1Id, p2Id] = playerSlots;
     if (players[p1Id]?.wager !== null && players[p2Id]?.wager !== null) {
       clearInterval(timerInterval);
@@ -128,19 +113,15 @@ io.on("connection", (socket) => {
     }
   });
 
-  // Listen for reset_game event
   socket.on("reset_game", () => {
     playerReady.add(socket.id);
     if (playerReady.size === 2) {
       resetGameState();
       startTimer();
-
-      // Emit an event to re-enable wager input fields and buttons
       io.emit("enable_wager_input");
     }
   });
 
-  // Handle disconnections
   socket.on("disconnect", () => {
     console.log(`${players[socket.id]?.name || "A player"} disconnected.`);
     const slotIndex = playerSlots.indexOf(socket.id);
@@ -156,7 +137,6 @@ io.on("connection", (socket) => {
   });
 });
 
-// Function to start the timer
 function startTimer() {
   let timeRemaining = 60;
   io.emit("update_timer", timeRemaining);
@@ -170,7 +150,6 @@ function startTimer() {
   }, 1000);
 }
 
-// Function to handle timeout
 function handleTimeout() {
   const [p1Id, p2Id] = playerSlots;
   const p1 = players[p1Id];
@@ -184,25 +163,21 @@ function handleTimeout() {
   let logEntry = "";
 
   if (p1.wager === null && p2.wager !== null) {
-    // Player 1 timed out
     timedOutPlayer = p1;
     winningPlayer = p2;
     lostUnits = p2.wager;
-    consecutiveDoubleTimeouts = 0; // Reset consecutive double timeouts counter
+    consecutiveDoubleTimeouts = 0;
     logEntry = `${p1.name} timed out and lost ${lostUnits} units to ${p2.name}.`;
   } else if (p2.wager === null && p1.wager !== null) {
-    // Player 2 timed out
     timedOutPlayer = p2;
     winningPlayer = p1;
     lostUnits = p1.wager;
-    consecutiveDoubleTimeouts = 0; // Reset consecutive double timeouts counter
+    consecutiveDoubleTimeouts = 0;
     logEntry = `${p2.name} timed out and lost ${lostUnits} units to ${p1.name}.`;
   } else if (p1.wager === null && p2.wager === null) {
-    // Double timeout
     consecutiveDoubleTimeouts++;
     logEntry = `Double timeout. Consecutive double timeouts: ${consecutiveDoubleTimeouts}.`;
 
-    // Check for 3 consecutive double timeouts
     if (consecutiveDoubleTimeouts === 3) {
       if (p1.units > p2.units) {
         handleGameOver(p1Id);
@@ -224,6 +199,7 @@ function handleTimeout() {
     winningPlayer.units += lostUnits;
     io.emit("round_result", {
       units: { [p1Id]: p1.units, [p2Id]: p2.units },
+      logEntry,
       isDraw: false,
     });
   }
@@ -231,7 +207,6 @@ function handleTimeout() {
   p1.wager = null;
   p2.wager = null;
 
-  // Check for end-game condition (units below 20)
   if (p1.units < 20 || p2.units < 20) {
     const winnerId = p1.units >= 20 ? p1Id : p2Id;
     handleGameOver(winnerId);
@@ -240,36 +215,27 @@ function handleTimeout() {
   }
 }
 
-// Function to handle game over
 function handleGameOver(winnerId) {
   const p1Id = playerSlots[0];
   const p2Id = playerSlots[1];
 
-  // Determine the end message
   let endMessage = "";
   if (winnerId === p1Id) {
-    endMessage = "Congratulations, you won!";
+    io.to(p1Id).emit("game_over", { endMessage: "Congratulations, you won!" });
+    io.to(p2Id).emit("game_over", { endMessage: "Game over, you lost." });
   } else if (winnerId === p2Id) {
-    endMessage = "Game over, you lost.";
+    io.to(p2Id).emit("game_over", { endMessage: "Congratulations, you won!" });
+    io.to(p1Id).emit("game_over", { endMessage: "Game over, you lost." });
   } else {
-    endMessage = "Game over, it's a draw!";
+    io.emit("game_over", { endMessage: "Game over, it's a draw!" });
   }
 
-  // Emit game_over event to all clients
-  io.emit("game_over", { winnerId, endMessage });
-
-  // Disable wager input and button
   io.emit("disable_wager_input");
-
-  // Stop the timer
   clearInterval(timerInterval);
   io.emit("update_timer", 0);
-
-  // Set game over state
   isGameOver = true;
 }
 
-// Function to calculate round winner
 function calculateRoundWinner(player1Id, player2Id) {
   const p1 = players[player1Id];
   const p2 = players[player2Id];
@@ -279,14 +245,14 @@ function calculateRoundWinner(player1Id, player2Id) {
 
   if (p1.wager === p2.wager) {
     logEntry += `It's a draw!`;
-    io.emit("update_game_log", logEntry);
     io.emit("round_result", {
       units: { [player1Id]: p1.units, [player2Id]: p2.units },
+      logEntry,
       isDraw: true,
     });
     p1.wager = null;
     p2.wager = null;
-    consecutiveDoubleTimeouts = 0; // Reset consecutive double timeouts counter
+    consecutiveDoubleTimeouts = 0;
     startTimer();
     return;
   }
@@ -316,17 +282,16 @@ function calculateRoundWinner(player1Id, player2Id) {
   }
 
   logEntry += `${winner.name} wins ${logNote ? logNote : ""}!`;
-  io.emit("update_game_log", logEntry);
   io.emit("round_result", {
     units: { [player1Id]: p1.units, [player2Id]: p2.units },
+    logEntry,
     isDraw: false,
   });
 
   p1.wager = null;
   p2.wager = null;
-  consecutiveDoubleTimeouts = 0; // Reset consecutive double timeouts counter
+  consecutiveDoubleTimeouts = 0;
 
-  // Check for end-game condition (units below 20)
   if (p1.units < 20 || p2.units < 20) {
     const winnerId = p1.units >= 20 ? player1Id : player2Id;
     handleGameOver(winnerId);

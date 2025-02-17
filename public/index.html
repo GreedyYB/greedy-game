@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Greedy Game</title>
   <link href="https://fonts.googleapis.com/css2?family=Nosifer&display=swap" rel="stylesheet">
   <style>
@@ -17,18 +17,18 @@
     }
 
     h1 {
-      color: #015c21; /* Dark green */
-      font-size: 3em; /* Reduced for smaller screens */
-      margin-bottom: 20px; /* Reduced for smaller screens */
+      color: #015c21;
+      font-size: 3em;
+      margin-bottom: 20px;
       font-family: 'Nosifer', cursive;
       text-shadow: 2px 2px 0 #fff, -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff;
     }
 
     #player-name {
       font-weight: 400;
-      font-size: 1.5em; /* Reduced for smaller screens */
+      font-size: 1.5em;
       font-family: 'Nosifer', cursive;
-      margin: 10px 0; /* Reduced for smaller screens */
+      margin: 10px 0;
       text-shadow: 1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff;
     }
 
@@ -45,11 +45,11 @@
       margin-right: 10px;
       font-weight: bold;
       font-family: 'Gabarito', sans-serif;
-      font-size: 1.5em; /* Reduced for smaller screens */
+      font-size: 1.5em;
     }
 
     .status-bar {
-      width: 60%; /* Use percentage for responsiveness */
+      width: 60%;
       height: 40px;
       background-color: #fdf6f6;
       position: relative;
@@ -58,8 +58,8 @@
 
     .status-fill {
       height: 100%;
-      background-color: blue; /* Default color */
-      transition: width 0.5s ease, background-color 0.5s ease; /* Smooth transitions */
+      background-color: blue;
+      transition: width 0.5s ease, background-color 0.5s ease;
     }
 
     .status-bar::before {
@@ -82,15 +82,25 @@
     #game-over-message {
       text-align: center;
       margin-top: 20px;
-      display: none; /* Hidden by default */
+      display: none;
     }
 
     #game-over-message h2 {
       margin-bottom: 10px;
+      font-size: 2em;
+      font-weight: bold;
+    }
+
+    #game-over-message h2.win {
+      color: green;
+    }
+
+    #game-over-message h2.lose {
+      color: red;
     }
 
     #play-again-button {
-      display: none; /* Hidden by default */
+      display: none;
       padding: 10px 20px;
       background-color: green;
       color: white;
@@ -130,7 +140,7 @@
     }
 
     #timer {
-      font-size: 2em; /* Reduced for smaller screens */
+      font-size: 2em;
       font-weight: bold;
       margin-top: 10px;
       color: black;
@@ -155,7 +165,7 @@
     }
 
     #round-counter {
-      font-size: 1.5em; /* Reduced for smaller screens */
+      font-size: 1.5em;
       font-weight: bold;
       margin-top: 10px;
     }
@@ -165,57 +175,69 @@
       margin-top: 20px;
     }
 
-    /* Custom Keypad Styles */
+    /* Keypad Styles */
     #keypad {
-      display: none; /* Hidden by default */
-      position: fixed;
-      bottom: 0;
-      left: 0;
-      right: 0;
-      background-color: #f1f1f1;
-      padding: 10px;
-      box-shadow: 0 -2px 10px rgba(0, 0, 0, 0.1);
-      z-index: 1000;
-    }
-
-    #keypad .keypad-row {
-      display: flex;
-      justify-content: center;
+      display: none;
+      grid-template-columns: repeat(3, 1fr);
       gap: 10px;
-      margin-bottom: 10px;
+      max-width: 300px;
+      margin: 20px auto;
     }
 
-    #keypad .keypad-button {
-      width: 60px;
-      height: 60px;
-      font-size: 1.5em;
-      background-color: #fff;
+    #keypad button {
+      padding: 15px;
+      font-size: 1.2em;
       border: 1px solid #ccc;
       border-radius: 5px;
       cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
     }
 
-    #keypad .keypad-button:hover {
-      background-color: #f0f0f0;
+    #keypad button:hover {
+      opacity: 0.8;
     }
 
-    #keypad .keypad-button.lock-in {
-      background-color: #4CAF50;
+    #keypad button[onclick="clearWager()"] {
+      background-color: yellow;
+    }
+
+    #keypad button[onclick="lockInWager()"] {
+      background-color: green;
+      color: white;
+    }
+
+    #place-wager-button {
+      padding: 15px 30px;
+      font-size: 1.2em;
+      background-color: green;
       color: white;
       border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      margin: 20px auto;
+      display: block;
     }
 
-    #keypad .keypad-button.lock-in:hover {
-      background-color: #45a049;
+    #place-wager-button:hover {
+      background-color: darkgreen;
+    }
+
+    #current-wager {
+      font-size: 1.5em;
+      margin: 10px 0;
+    }
+
+    /* Waiting Messages */
+    #waiting-message {
+      margin-top: 20px;
+      font-style: italic;
+      color: #400af0;
+      display: none;
     }
 
     /* Media Queries for Responsiveness */
     @media (max-width: 600px) {
       h1 {
-        font-size: 2em; /* Further reduced for very small screens */
+        font-size: 2em;
       }
 
       #player-name {
@@ -227,7 +249,7 @@
       }
 
       .status-bar {
-        width: 50%; /* Adjust width for smaller screens */
+        width: 50%;
       }
 
       #timer {
@@ -238,13 +260,18 @@
         font-size: 1.2em;
       }
 
-      #wager {
-        width: 80%; /* Make input field wider on small screens */
+      #keypad {
+        max-width: 100%;
       }
 
-      button {
-        width: 80%; /* Make button wider on small screens */
-        margin-top: 10px; /* Add some space between input and button */
+      #keypad button {
+        padding: 10px;
+        font-size: 1em;
+      }
+
+      #place-wager-button {
+        padding: 10px 20px;
+        font-size: 1em;
       }
     }
   </style>
@@ -267,11 +294,35 @@
     <div class="player-label" style="text-align: right;">OPPONENT</div>
   </div>
 
-  <!-- Input field and button for placing wagers -->
+  <!-- Display player name -->
   <h3 id="player-name">Connecting...</h3>
-  <button id="select-wager" onclick="showKeypad()">Select Wager</button>
-  <div id="wager-display"></div>
+
+  <!-- Display current wager -->
+  <div id="current-wager">Wager: 0</div>
+
+  <!-- Place Wager Button -->
+  <button id="place-wager-button" onclick="showKeypad()">Place Wager</button>
+
+  <!-- Keypad for wager input -->
+  <div id="keypad">
+    <button onclick="addToWager(1)">1</button>
+    <button onclick="addToWager(2)">2</button>
+    <button onclick="addToWager(3)">3</button>
+    <button onclick="addToWager(4)">4</button>
+    <button onclick="addToWager(5)">5</button>
+    <button onclick="addToWager(6)">6</button>
+    <button onclick="addToWager(7)">7</button>
+    <button onclick="addToWager(8)">8</button>
+    <button onclick="addToWager(9)">9</button>
+    <button onclick="addToWager(0)">0</button>
+    <button onclick="clearWager()">C</button>
+    <button onclick="lockInWager()">Lock In</button>
+  </div>
+
+  <!-- Display wager limits -->
   <div id="wager-limits">Minimum wager: 10 units. Maximum wager: 200 units.</div>
+
+  <!-- Display wager confirmation message -->
   <div id="wager-confirmation"></div>
 
   <!-- Round counter and timer display -->
@@ -284,196 +335,108 @@
     <button id="play-again-button" onclick="playAgain()">Press me to play again!</button>
   </div>
 
+  <!-- Waiting Message -->
+  <div id="waiting-message"></div>
+
   <!-- Game Log -->
   <h3 id="game-log-heading">Game Log:</h3>
   <div id="game-log"></div>
 
-  <!-- Custom Numeric Keypad -->
-  <div id="keypad">
-    <div class="keypad-row">
-      <div class="keypad-button" onclick="addDigit(1)">1</div>
-      <div class="keypad-button" onclick="addDigit(2)">2</div>
-      <div class="keypad-button" onclick="addDigit(3)">3</div>
-    </div>
-    <div class="keypad-row">
-      <div class="keypad-button" onclick="addDigit(4)">4</div>
-      <div class="keypad-button" onclick="addDigit(5)">5</div>
-      <div class="keypad-button" onclick="addDigit(6)">6</div>
-    </div>
-    <div class="keypad-row">
-      <div class="keypad-button" onclick="addDigit(7)">7</div>
-      <div class="keypad-button" onclick="addDigit(8)">8</div>
-      <div class="keypad-button" onclick="addDigit(9)">9</div>
-    </div>
-    <div class="keypad-row">
-      <div class="keypad-button" onclick="addDigit(0)">0</div>
-      <div class="keypad-button" onclick="clearWager()">C</div>
-      <div class="keypad-button lock-in" onclick="lockInWager()">Lock In</div>
-    </div>
-  </div>
-
   <script src="/socket.io/socket.io.js"></script>
   <script>
-    // Use Render server URL in production, localhost in development
-    const serverUrl = window.location.hostname === "localhost" ? "http://localhost:10000" : "https://greedy-game-2z4z.onrender.com";
-    const socket = io(serverUrl);
+    const socket = io();
 
-    let playerId = null; // This player's ID
-    let opponentId = null; // Opponent's ID
-    let minWager = 10; // Minimum wager
-    let maxWager = 200; // Maximum wager
-    let roundNumber = 1; // Track the current round number
-    let currentWager = ""; // Track the current wager input
+    let playerId = null;
+    let opponentId = null;
+    let minWager = 10;
+    let maxWager = 200;
+    let roundNumber = 1;
+    let currentWager = 0;
 
-    // Debug: Log connection status
-    socket.on("connect", () => {
-      console.log("Connected to server with socket ID:", socket.id);
-    });
+    // Function to interpolate between two RGB colors
+    function interpolateColor(color1, color2, factor) {
+      const result = color1.slice();
+      for (let i = 0; i < 3; i++) {
+        result[i] = Math.round(result[i] + factor * (color2[i] - color1[i]));
+      }
+      return result;
+    }
 
-    socket.on("connect_error", (error) => {
-      console.error("Connection error:", error);
-    });
+    // Function to calculate color based on units
+    function calculateColor(units) {
+      const blue = [0, 0, 255]; // RGB for blue
+      const red = [255, 0, 0]; // RGB for red
+      const green = [0, 255, 0]; // RGB for green
 
-    // Function to show the custom keypad
+      if (units <= 200) {
+        // Interpolate between red (0 units) and blue (200 units)
+        const factor = units / 200;
+        return interpolateColor(red, blue, factor);
+      } else {
+        // Interpolate between blue (200 units) and green (400 units)
+        const factor = (units - 200) / 200;
+        return interpolateColor(blue, green, factor);
+      }
+    }
+
+    // Function to update the status bar and player counter colors
+    function updateColors(units) {
+      const color = calculateColor(units);
+      const playerBar = document.getElementById("player-bar");
+      const playerUnits = document.getElementById("player-units");
+
+      // Update status bar color
+      playerBar.style.backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+
+      // Update player counter color
+      playerUnits.style.color = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+    }
+
+    // Function to show the keypad
     function showKeypad() {
-      document.getElementById("keypad").style.display = "block";
+      const keypad = document.getElementById("keypad");
+      const placeWagerButton = document.getElementById("place-wager-button");
+
+      keypad.style.display = "grid";
+      placeWagerButton.style.display = "none";
     }
 
-    // Function to hide the custom keypad
-    function hideKeypad() {
-      document.getElementById("keypad").style.display = "none";
-    }
-
-    // Function to add a digit to the wager
-    function addDigit(digit) {
-      if (currentWager.length < 3) { // Limit wager to 3 digits
-        currentWager += digit;
+    // Function to add a digit to the current wager
+    function addToWager(digit) {
+      const newWager = currentWager * 10 + digit;
+      if (newWager <= maxWager) {
+        currentWager = newWager;
         updateWagerDisplay();
       }
     }
 
-    // Function to clear the wager
+    // Function to clear the current wager
     function clearWager() {
-      currentWager = "";
+      currentWager = 0;
       updateWagerDisplay();
     }
 
     // Function to update the wager display
     function updateWagerDisplay() {
-      document.getElementById("wager-display").innerText = currentWager || "0";
+      document.getElementById("current-wager").innerText = `Wager: ${currentWager}`;
     }
 
     // Function to lock in the wager
     function lockInWager() {
-      const wager = parseInt(currentWager);
-
-      if (isNaN(wager)) {
-        alert("Please enter a valid number.");
-        return;
-      }
-
-      if (wager < minWager || wager > maxWager) {
+      if (currentWager < minWager || currentWager > maxWager) {
         alert(`Your wager must be between ${minWager} and ${maxWager} units.`);
         return;
       }
 
-      // Debug: Log the wager being sent
-      console.log("Emitting place_wager event with wager:", wager);
+      const keypad = document.getElementById("keypad");
+      keypad.style.display = "none";
 
-      // Send the wager to the server
-      socket.emit("place_wager", wager);
+      const placeWagerButton = document.getElementById("place-wager-button");
+      placeWagerButton.innerText = `Your ${currentWager} unit wager is locked in!`;
+      placeWagerButton.style.display = "block";
 
-      // Disable the keypad
-      hideKeypad();
-
-      // Display confirmation message
-      document.getElementById("wager-confirmation").innerText = `Your ${wager} unit wager is locked in! Waiting for your opponent.`;
-
-      // Clear the wager input
-      currentWager = "";
-      updateWagerDisplay();
+      socket.emit("place_wager", currentWager);
     }
-
-    // Handle game_over event
-    socket.on("game_over", (data) => {
-      const endMessage = document.getElementById("end-message");
-      endMessage.innerText = data.endMessage;
-
-      // Show game over message and play again button
-      document.getElementById("game-over-message").style.display = "block";
-      document.getElementById("play-again-button").style.display = "inline-block";
-
-      // Disable wager input and button
-      document.getElementById("wager").disabled = true;
-      document.querySelector("button").disabled = true;
-
-      // Stop the timer at 0
-      document.getElementById("timer").innerText = "0";
-    });
-
-    // Handle disable_wager_input event
-    socket.on("disable_wager_input", () => {
-      document.getElementById("wager").disabled = true;
-      document.querySelector("button").disabled = true;
-    });
-
-    // Handle enable_wager_input event
-    socket.on("enable_wager_input", () => {
-      document.getElementById("wager").disabled = false;
-      document.querySelector("button").disabled = false;
-    });
-
-    // Handle update_timer event
-    socket.on("update_timer", (timeRemaining) => {
-      const timerElement = document.getElementById("timer");
-      timerElement.innerText = timeRemaining;
-
-      // Change the timer text color to red for the final 5 seconds
-      if (timeRemaining <= 5) {
-        timerElement.classList.add("red");
-      } else {
-        timerElement.classList.remove("red");
-      }
-    });
-
-    // Handle round_result event
-    socket.on("round_result", (data) => {
-      const playerUnits = data.units[playerId];
-      const opponentUnits = data.units[opponentId];
-
-      // Update player units and status bar
-      document.getElementById("player-units").innerText = playerUnits || "0";
-      document.getElementById("player-bar").style.width = `${(playerUnits / 400) * 100}%`;
-      document.getElementById("opponent-units").innerText = opponentUnits || "0";
-
-      // Update wager limits
-      minWager = 10;
-      maxWager = playerUnits;
-      document.getElementById("wager-limits").innerText =
-        `Minimum wager: ${minWager} units. Maximum wager: ${maxWager} units.`;
-
-      // Clear the wager input field
-      document.getElementById("wager").value = "";
-
-      // Re-enable the wager input field and button
-      document.getElementById("wager").disabled = false;
-      document.querySelector("button").disabled = false;
-
-      // Clear the wager confirmation message
-      document.getElementById("wager-confirmation").innerText = "";
-
-      // Update round counter
-      roundNumber++;
-      document.getElementById("round-counter").innerText = `Round ${roundNumber}`;
-    });
-
-    // Handle update_game_log event
-    socket.on("update_game_log", (logEntry) => {
-      const gameLog = document.getElementById("game-log");
-      const logItem = document.createElement("p");
-      logItem.innerText = logEntry;
-      gameLog.prepend(logItem);
-    });
 
     // Handle assign_name event
     socket.on("assign_name", (data) => {
@@ -481,14 +444,77 @@
       playerId = data.id;
     });
 
+    // Handle game_over event
+    socket.on("game_over", (data) => {
+      const endMessage = document.getElementById("end-message");
+      endMessage.innerText = data.endMessage;
+
+      // Add class for styling based on win/lose
+      if (data.endMessage.includes("won")) {
+        endMessage.classList.add("win");
+      } else if (data.endMessage.includes("lost")) {
+        endMessage.classList.add("lose");
+      }
+
+      document.getElementById("game-over-message").style.display = "block";
+      document.getElementById("play-again-button").style.display = "inline-block";
+
+      document.getElementById("place-wager-button").style.display = "none";
+      document.getElementById("keypad").style.display = "none";
+      document.getElementById("wager-limits").style.display = "none";
+      document.getElementById("wager-confirmation").style.display = "none";
+
+      document.getElementById("timer").innerText = "0";
+
+      // Add game over message to the game log
+      const gameLog = document.getElementById("game-log");
+      const logItem = document.createElement("p");
+      logItem.innerText = `Game Over! ${data.endMessage}`;
+      gameLog.prepend(logItem);
+    });
+
     // Handle opponent_locked_wager event
     socket.on("opponent_locked_wager", () => {
       document.getElementById("wager-confirmation").innerText = "Opponent has locked in their wager.";
     });
 
+    // Handle round_result event
+    socket.on("round_result", (data) => {
+      const playerUnits = data.units[playerId];
+      const opponentUnits = data.units[opponentId];
+
+      document.getElementById("player-units").innerText = playerUnits || "0";
+      document.getElementById("player-bar").style.width = `${(playerUnits / 400) * 100}%`;
+      document.getElementById("opponent-units").innerText = opponentUnits || "0";
+
+      // Update status bar color
+      updateColors(playerUnits);
+
+      minWager = 10;
+      maxWager = playerUnits;
+      document.getElementById("wager-limits").innerText =
+        `Minimum wager: ${minWager} units. Maximum wager: ${maxWager} units.`;
+
+      currentWager = 0;
+      updateWagerDisplay();
+
+      const placeWagerButton = document.getElementById("place-wager-button");
+      placeWagerButton.innerText = "Place Wager";
+      placeWagerButton.style.display = "block";
+
+      document.getElementById("wager-confirmation").innerText = "";
+
+      roundNumber++;
+      document.getElementById("round-counter").innerText = `Round ${roundNumber}`;
+
+      const gameLog = document.getElementById("game-log");
+      const logItem = document.createElement("p");
+      logItem.innerText = data.logEntry || "Round result: No log entry provided.";
+      gameLog.prepend(logItem);
+    });
+
     // Handle game_reset_complete event
     socket.on("game_reset_complete", () => {
-      // Reset UI elements
       document.getElementById("game-log").innerHTML = "";
       document.getElementById("player-units").innerText = "200";
       document.getElementById("opponent-units").innerText = "200";
@@ -496,23 +522,31 @@
       document.getElementById("player-bar").style.backgroundColor = "blue";
       document.getElementById("game-over-message").style.display = "none";
       document.getElementById("play-again-button").style.display = "none";
+      document.getElementById("waiting-message").style.display = "none";
 
-      // Reset wager limits
+      // Reset the color of the number indicator to match the blue of the status bar
+      document.getElementById("player-units").style.color = "rgb(0, 0, 255)";
+
       minWager = 10;
       maxWager = 200;
       document.getElementById("wager-limits").innerText =
         "Minimum wager: 10 units. Maximum wager: 200 units.";
 
-      // Clear the wager confirmation message
-      document.getElementById("wager-confirmation").innerText = "";
+      currentWager = 0;
+      updateWagerDisplay();
 
-      // Reset round counter
-      roundNumber = 1;
-      document.getElementById("round-counter").innerText = `Round ${roundNumber}`;
+      const placeWagerButton = document.getElementById("place-wager-button");
+      placeWagerButton.innerText = "Place Wager";
+      placeWagerButton.style.display = "block";
 
-      // Reset timer to 60 seconds
-      document.getElementById("timer").innerText = "60";
+      document.getElementById("wager-limits").style.display = "block";
+      document.getElementById("wager-confirmation").style.display = "block";
     });
+
+    // Function to reset the game
+    function playAgain() {
+      socket.emit("reset_game");
+    }
   </script>
 </body>
 </html>
