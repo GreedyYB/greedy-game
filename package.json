@@ -11,9 +11,9 @@
   "license": "ISC",
   "description": "GREEDY! is a two-player wagering game. If your wager is greater than your opponent's wager, you win the round... unless you wager more than 3X your opponent's wager, in which case you lose. You both begin with 200 units. You win the game once you have 381 or more units at the end of any round. Conversely, you lose if you go below 20 units at the end of any round.",
   "dependencies": {
-    "dotenv": "^16.4.7",
-    "express": "^4.21.2",
-    "socket.io": "^4.8.1"
+    "dotenv": "^16.0.3",
+    "express": "^4.18.2",
+    "socket.io": "^4.6.1"
   },
   "repository": {
     "type": "git",

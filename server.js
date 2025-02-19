@@ -44,6 +44,8 @@ function resetGameState() {
   playerReady.clear();
   clearInterval(timerInterval);
   io.emit("game_reset_complete");
+  startTimer();
+  io.emit("enable_wager_input");
 }
 
 io.on("connection", (socket) => {
@@ -80,7 +82,6 @@ io.on("connection", (socket) => {
     });
     startTimer();
   }
-
   socket.on("place_wager", (wager) => {
     if (isGameOver) {
       socket.emit("error_message", "The game has ended. Please start a new game.");
@@ -115,10 +116,19 @@ io.on("connection", (socket) => {
 
   socket.on("reset_game", () => {
     playerReady.add(socket.id);
+    
+    const [p1Id, p2Id] = playerSlots;
+    const currentPlayer = players[socket.id];
+    const otherPlayerId = socket.id === p1Id ? p2Id : p1Id;
+    const otherPlayer = players[otherPlayerId];
+
+    if (playerReady.size === 1) {
+      io.to(socket.id).emit("waiting_message", `Waiting for ${otherPlayer.name} to get back in the game`);
+      io.to(otherPlayerId).emit("waiting_message", `${currentPlayer.name} is waiting for you to get back in the game`);
+    }
+
     if (playerReady.size === 2) {
       resetGameState();
-      startTimer();
-      io.emit("enable_wager_input");
     }
   });
 
@@ -138,7 +148,7 @@ io.on("connection", (socket) => {
 });
 
 function startTimer() {
-  let timeRemaining = 60;
+  let timeRemaining = 20;
   io.emit("update_timer", timeRemaining);
   timerInterval = setInterval(() => {
     timeRemaining--;
@@ -176,22 +186,46 @@ function handleTimeout() {
     logEntry = `${p2.name} timed out and lost ${lostUnits} units to ${p1.name}.`;
   } else if (p1.wager === null && p2.wager === null) {
     consecutiveDoubleTimeouts++;
-    logEntry = `Double timeout. Consecutive double timeouts: ${consecutiveDoubleTimeouts}.`;
-
-    if (consecutiveDoubleTimeouts === 3) {
-      if (p1.units > p2.units) {
-        handleGameOver(p1Id);
-        logEntry += ` Game Over. ${p1.name} wins due to 3 consecutive double timeouts.`;
-      } else if (p2.units > p1.units) {
-        handleGameOver(p2Id);
-        logEntry += ` Game Over. ${p2.name} wins due to 3 consecutive double timeouts.`;
-      } else {
-        handleGameOver(null);
-        logEntry += ` Game Over. It's a draw due to 3 consecutive double timeouts.`;
-      }
+    
+    // Determine who's leading
+    let leadingPlayer = null;
+    if (p1.units > p2.units) {
+        leadingPlayer = p1;
+    } else if (p2.units > p1.units) {
+        leadingPlayer = p2;
     }
+    
+    // Create appropriate message based on consecutive timeouts
+    if (consecutiveDoubleTimeouts === 1) {
+        logEntry = `Double timeout! 3 in a row ends the game. ${leadingPlayer ? `${leadingPlayer.name} leads` : 'Units even'}`;
+    } else if (consecutiveDoubleTimeouts === 2) {
+        if (p1.units === p2.units) {
+            logEntry = "Second double timeout in a row! One more: Draw";
+        } else {
+            logEntry = `Second double timeout in a row! One more: ${leadingPlayer.name} wins`;
+        }
+    } else if (consecutiveDoubleTimeouts === 3) {
+        if (p1.units > p2.units) {
+            logEntry = `Third straight double timeout! ${p1.name} wins!`;
+            handleGameOver(p1Id);
+        } else if (p2.units > p1.units) {
+            logEntry = `Third straight double timeout! ${p2.name} wins!`;
+            handleGameOver(p2Id);
+        } else {
+            logEntry = "Third straight double timeout! It's a draw!";
+            handleGameOver(null);
+        }
+    }
+
+    // Emit round result for double timeout
+    io.emit("round_result", {
+        units: { [p1Id]: p1.units, [p2Id]: p2.units },
+        logEntry,
+        isDoubleTimeout: true
+    });
   }
 
+  // Emit the log entry
   io.emit("update_game_log", logEntry);
 
   if (timedOutPlayer && winningPlayer) {

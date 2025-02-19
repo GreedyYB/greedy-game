@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>Greedy Game</title>
-  <link href="https://fonts.googleapis.com/css2?family=Nosifer&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Nosifer&family=Roboto:wght@400;500;700&display=swap" rel="stylesheet">
   <style>
     /* General Styles */
     body {
@@ -13,7 +13,7 @@
       max-width: 800px;
       margin: 0 auto;
       padding: 20px;
-      font-family: 'Gabarito', sans-serif;
+      font-family: 'Roboto', sans-serif;
     }
 
     h1 {
@@ -27,7 +27,7 @@
     #player-name {
       font-weight: 400;
       font-size: 1.5em;
-      font-family: 'Nosifer', cursive;
+      font-family: 'Roboto', sans-serif;
       margin: 10px 0;
       text-shadow: 1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff;
     }
@@ -44,7 +44,7 @@
       text-align: right;
       margin-right: 10px;
       font-weight: bold;
-      font-family: 'Gabarito', sans-serif;
+      font-family: 'Roboto', sans-serif;
       font-size: 1.5em;
     }
 
@@ -75,7 +75,7 @@
     .opponent-units {
       margin-left: 10px;
       font-weight: bold;
-      font-family: 'Gabarito', sans-serif;
+      font-family: 'Roboto', sans-serif;
       color: black;
     }
 
@@ -99,6 +99,19 @@
       color: red;
     }
 
+    @keyframes messageWaitingPulse {
+      0% { opacity: 1; }
+      50% { opacity: 0.5; }
+      100% { opacity: 1; }
+    }
+
+    #game-over-message h2.waiting-message {
+      color: red !important;
+      font-size: 1em !important;
+      animation: messageWaitingPulse 1s infinite;
+      font-weight: bold;
+    }
+
     #play-again-button {
       display: none;
       padding: 10px 20px;
@@ -106,7 +119,7 @@
       color: white;
       border: none;
       cursor: pointer;
-      font-family: 'Gabarito', sans-serif;
+      font-family: 'Roboto', sans-serif;
       font-size: 16px;
     }
 
@@ -159,7 +172,7 @@
 
     .player-label {
       font-weight: bold;
-      font-family: 'Gabarito', sans-serif;
+      font-family: 'Roboto', sans-serif;
       margin-top: 10px;
       text-align: center;
     }
@@ -224,14 +237,6 @@
     #current-wager {
       font-size: 1.5em;
       margin: 10px 0;
-    }
-
-    /* Waiting Messages */
-    #waiting-message {
-      margin-top: 20px;
-      font-style: italic;
-      color: #400af0;
-      display: none;
     }
 
     /* Media Queries for Responsiveness */
@@ -327,7 +332,7 @@
 
   <!-- Round counter and timer display -->
   <div id="round-counter">Round 1</div>
-  <div id="timer">60</div>
+  <div id="timer">20</div>
 
   <!-- Game Over Message -->
   <div id="game-over-message">
@@ -335,16 +340,26 @@
     <button id="play-again-button" onclick="playAgain()">Press me to play again!</button>
   </div>
 
-  <!-- Waiting Message -->
-  <div id="waiting-message"></div>
-
   <!-- Game Log -->
   <h3 id="game-log-heading">Game Log:</h3>
   <div id="game-log"></div>
 
   <script src="/socket.io/socket.io.js"></script>
   <script>
-    const socket = io();
+    const socket = io({
+      reconnection: true,
+      reconnectionDelay: 1000,
+      reconnectionDelayMax: 5000,
+      reconnectionAttempts: 99999
+    });
+
+    socket.on('connect', () => {
+      console.log('Connected to server');
+    });
+
+    socket.on('connect_error', (error) => {
+      console.log('Connection error:', error);
+    });
 
     let playerId = null;
     let opponentId = null;
@@ -352,6 +367,7 @@
     let maxWager = 200;
     let roundNumber = 1;
     let currentWager = 0;
+    let consecutiveDoubleTimeouts = 0;
 
     // Function to interpolate between two RGB colors
     function interpolateColor(color1, color2, factor) {
@@ -364,16 +380,14 @@
 
     // Function to calculate color based on units
     function calculateColor(units) {
-      const blue = [0, 0, 255]; // RGB for blue
-      const red = [255, 0, 0]; // RGB for red
-      const green = [0, 255, 0]; // RGB for green
+      const blue = [0, 0, 255];
+      const red = [255, 0, 0];
+      const green = [0, 255, 0];
 
       if (units <= 200) {
-        // Interpolate between red (0 units) and blue (200 units)
         const factor = units / 200;
         return interpolateColor(red, blue, factor);
       } else {
-        // Interpolate between blue (200 units) and green (400 units)
         const factor = (units - 200) / 200;
         return interpolateColor(blue, green, factor);
       }
@@ -384,11 +398,7 @@
       const color = calculateColor(units);
       const playerBar = document.getElementById("player-bar");
       const playerUnits = document.getElementById("player-units");
-
-      // Update status bar color
       playerBar.style.backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
-
-      // Update player counter color
       playerUnits.style.color = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
     }
 
@@ -396,7 +406,6 @@
     function showKeypad() {
       const keypad = document.getElementById("keypad");
       const placeWagerButton = document.getElementById("place-wager-button");
-
       keypad.style.display = "grid";
       placeWagerButton.style.display = "none";
     }
@@ -434,9 +443,22 @@
       const placeWagerButton = document.getElementById("place-wager-button");
       placeWagerButton.innerText = `Your ${currentWager} unit wager is locked in!`;
       placeWagerButton.style.display = "block";
+      placeWagerButton.disabled = true;
 
       socket.emit("place_wager", currentWager);
     }
+
+    // Timer update handler
+    socket.on("update_timer", (timeRemaining) => {
+      const timerElement = document.getElementById("timer");
+      timerElement.innerText = timeRemaining;
+      
+      if (timeRemaining <= 10) {
+        timerElement.classList.add("red");
+      } else {
+        timerElement.classList.remove("red");
+      }
+    });
 
     // Handle assign_name event
     socket.on("assign_name", (data) => {
@@ -444,33 +466,47 @@
       playerId = data.id;
     });
 
+    // Handle game_ready event
+    socket.on("game_ready", (data) => {
+      const opponentKey = Object.keys(data.players).find(key => key !== playerId);
+      opponentId = opponentKey;
+      document.getElementById("place-wager-button").disabled = false;
+    });
+
     // Handle game_over event
     socket.on("game_over", (data) => {
       const endMessage = document.getElementById("end-message");
       endMessage.innerText = data.endMessage;
 
-      // Add class for styling based on win/lose
       if (data.endMessage.includes("won")) {
         endMessage.classList.add("win");
+        endMessage.classList.remove("lose", "waiting-message");
       } else if (data.endMessage.includes("lost")) {
         endMessage.classList.add("lose");
+        endMessage.classList.remove("win", "waiting-message");
       }
 
       document.getElementById("game-over-message").style.display = "block";
       document.getElementById("play-again-button").style.display = "inline-block";
-
       document.getElementById("place-wager-button").style.display = "none";
       document.getElementById("keypad").style.display = "none";
       document.getElementById("wager-limits").style.display = "none";
       document.getElementById("wager-confirmation").style.display = "none";
 
-      document.getElementById("timer").innerText = "0";
+      setTimeout(() => {
+        const gameLog = document.getElementById("game-log");
+        const logItem = document.createElement("p");
+        logItem.innerText = `Game Over! ${data.endMessage}`;
+        gameLog.prepend(logItem);
+      }, 100);
+    });
 
-      // Add game over message to the game log
-      const gameLog = document.getElementById("game-log");
-      const logItem = document.createElement("p");
-      logItem.innerText = `Game Over! ${data.endMessage}`;
-      gameLog.prepend(logItem);
+    // Handle waiting message
+    socket.on("waiting_message", (message) => {
+      const endMessage = document.getElementById("end-message");
+      endMessage.innerText = message;
+      endMessage.classList.remove("win", "lose");
+      endMessage.classList.add("waiting-message");
     });
 
     // Handle opponent_locked_wager event
@@ -487,7 +523,6 @@
       document.getElementById("player-bar").style.width = `${(playerUnits / 400) * 100}%`;
       document.getElementById("opponent-units").innerText = opponentUnits || "0";
 
-      // Update status bar color
       updateColors(playerUnits);
 
       minWager = 10;
@@ -501,46 +536,81 @@
       const placeWagerButton = document.getElementById("place-wager-button");
       placeWagerButton.innerText = "Place Wager";
       placeWagerButton.style.display = "block";
+      placeWagerButton.disabled = false;
 
       document.getElementById("wager-confirmation").innerText = "";
 
-      roundNumber++;
+      if (!data.isDoubleTimeout) {
+        roundNumber++;
+        consecutiveDoubleTimeouts = 0;
+      }
+      
       document.getElementById("round-counter").innerText = `Round ${roundNumber}`;
 
-      const gameLog = document.getElementById("game-log");
-      const logItem = document.createElement("p");
-      logItem.innerText = data.logEntry || "Round result: No log entry provided.";
-      gameLog.prepend(logItem);
+      if (data.logEntry) {
+        const gameLog = document.getElementById("game-log");
+        const existingEntries = gameLog.childNodes;
+        
+        if (existingEntries.length === 0 || existingEntries[0].innerText !== data.logEntry) {
+          const logItem = document.createElement("p");
+          logItem.innerText = data.logEntry;
+          gameLog.prepend(logItem);
+        }
+      }
     });
 
     // Handle game_reset_complete event
     socket.on("game_reset_complete", () => {
-      document.getElementById("game-log").innerHTML = "";
-      document.getElementById("player-units").innerText = "200";
-      document.getElementById("opponent-units").innerText = "200";
-      document.getElementById("player-bar").style.width = "50%";
-      document.getElementById("player-bar").style.backgroundColor = "blue";
-      document.getElementById("game-over-message").style.display = "none";
-      document.getElementById("play-again-button").style.display = "none";
-      document.getElementById("waiting-message").style.display = "none";
+  document.getElementById("game-log").innerHTML = "";
+  
+  // Reset player units and colors
+  const playerUnits = document.getElementById("player-units");
+  const opponentUnits = document.getElementById("opponent-units");
+  
+  playerUnits.innerText = "200";
+  opponentUnits.innerText = "200";
+  playerUnits.style.color = "rgb(0, 0, 255)"; // Set to blue
+  
+  document.getElementById("player-bar").style.width = "50%";
+  document.getElementById("player-bar").style.backgroundColor = "rgb(0, 0, 255)"; // Set to blue
+  
+  document.getElementById("game-over-message").style.display = "none";
+  document.getElementById("play-again-button").style.display = "none";
+  document.getElementById("timer").classList.remove("red");
 
-      // Reset the color of the number indicator to match the blue of the status bar
-      document.getElementById("player-units").style.color = "rgb(0, 0, 255)";
+  const endMessage = document.getElementById("end-message");
+  endMessage.classList.remove("waiting-message");
 
-      minWager = 10;
-      maxWager = 200;
-      document.getElementById("wager-limits").innerText =
-        "Minimum wager: 10 units. Maximum wager: 200 units.";
+  minWager = 10;
+  maxWager = 200;
+  document.getElementById("wager-limits").innerText =
+    "Minimum wager: 10 units. Maximum wager: 200 units.";
 
-      currentWager = 0;
-      updateWagerDisplay();
+  currentWager = 0;
+  updateWagerDisplay();
 
-      const placeWagerButton = document.getElementById("place-wager-button");
-      placeWagerButton.innerText = "Place Wager";
-      placeWagerButton.style.display = "block";
+  const placeWagerButton = document.getElementById("place-wager-button");
+  placeWagerButton.innerText = "Place Wager";
+  placeWagerButton.style.display = "block";
+  placeWagerButton.disabled = false;
 
-      document.getElementById("wager-limits").style.display = "block";
-      document.getElementById("wager-confirmation").style.display = "block";
+  document.getElementById("wager-limits").style.display = "block";
+  document.getElementById("wager-confirmation").style.display = "block";
+  
+  roundNumber = 1;
+  consecutiveDoubleTimeouts = 0;
+  document.getElementById("round-counter").innerText = `Round ${roundNumber}`;
+});
+
+    // Handle disable_wager_input event
+    socket.on("disable_wager_input", () => {
+      document.getElementById("place-wager-button").disabled = true;
+      document.getElementById("keypad").style.display = "none";
+    });
+
+    // Handle enable_wager_input event
+    socket.on("enable_wager_input", () => {
+      document.getElementById("place-wager-button").disabled = false;
     });
 
     // Function to reset the game
@@ -549,4 +619,4 @@
     }
   </script>
 </body>
-</html>
+</html> 
