@@ -80,8 +80,10 @@ io.on("connection", (socket) => {
         [playerSlots[1]]: players[playerSlots[1]],
       },
     });
+    io.emit("update_round", roundNumber + 1);
     startTimer();
   }
+
   socket.on("place_wager", (wager) => {
     if (isGameOver) {
       socket.emit("error_message", "The game has ended. Please start a new game.");
@@ -167,6 +169,9 @@ function handleTimeout() {
 
   if (!p1 || !p2) return;
 
+  // Increment round number at the start for all timeout scenarios
+  roundNumber++;
+
   let timedOutPlayer = null;
   let winningPlayer = null;
   let lostUnits = 0;
@@ -177,13 +182,13 @@ function handleTimeout() {
     winningPlayer = p2;
     lostUnits = p2.wager;
     consecutiveDoubleTimeouts = 0;
-    logEntry = `${p1.name} timed out and lost ${lostUnits} units to ${p2.name}.`;
+    logEntry = `Round ${roundNumber}: ${p1.name} timed out and lost ${lostUnits} units to ${p2.name}.`;
   } else if (p2.wager === null && p1.wager !== null) {
     timedOutPlayer = p2;
     winningPlayer = p1;
     lostUnits = p1.wager;
     consecutiveDoubleTimeouts = 0;
-    logEntry = `${p2.name} timed out and lost ${lostUnits} units to ${p1.name}.`;
+    logEntry = `Round ${roundNumber}: ${p2.name} timed out and lost ${lostUnits} units to ${p1.name}.`;
   } else if (p1.wager === null && p2.wager === null) {
     consecutiveDoubleTimeouts++;
     
@@ -197,35 +202,76 @@ function handleTimeout() {
     
     // Create appropriate message based on consecutive timeouts
     if (consecutiveDoubleTimeouts === 1) {
-        logEntry = `Double timeout! 3 in a row ends the game. ${leadingPlayer ? `${leadingPlayer.name} leads` : 'Units even'}`;
+        logEntry = `Round ${roundNumber}: Double timeout! 3 in a row ends the game. ${leadingPlayer ? `${leadingPlayer.name} leads` : 'Units even'}`;
     } else if (consecutiveDoubleTimeouts === 2) {
         if (p1.units === p2.units) {
-            logEntry = "Second double timeout in a row! One more: Draw";
+            logEntry = `Round ${roundNumber}: Second double timeout in a row! One more: Draw`;
         } else {
-            logEntry = `Second double timeout in a row! One more: ${leadingPlayer.name} wins`;
+            logEntry = `Round ${roundNumber}: Second double timeout in a row! One more: ${leadingPlayer.name} wins`;
         }
     } else if (consecutiveDoubleTimeouts === 3) {
         if (p1.units > p2.units) {
-            logEntry = `Third straight double timeout! ${p1.name} wins!`;
-            handleGameOver(p1Id);
+            logEntry = `Round ${roundNumber}: Third straight double timeout! ${p1.name} wins!`;
+            io.emit("update_game_log", logEntry);  // Send the TDT message first
+            io.emit("round_result", {
+                units: { [p1Id]: p1.units, [p2Id]: p2.units },
+                logEntry,
+                isDoubleTimeout: true,
+                roundNumber: roundNumber,
+                isTDT: true  // Flag for triple double timeout
+            });
+            setTimeout(() => {
+                handleGameOver(p1Id);
+            }, 300);  // Delay game over to ensure TDT message is shown
+            return;
         } else if (p2.units > p1.units) {
-            logEntry = `Third straight double timeout! ${p2.name} wins!`;
-            handleGameOver(p2Id);
+            logEntry = `Round ${roundNumber}: Third straight double timeout! ${p2.name} wins!`;
+            io.emit("update_game_log", logEntry);  // Send the TDT message first
+            io.emit("round_result", {
+                units: { [p1Id]: p1.units, [p2Id]: p2.units },
+                logEntry,
+                isDoubleTimeout: true,
+                roundNumber: roundNumber,
+                isTDT: true  // Flag for triple double timeout
+            });
+            setTimeout(() => {
+                handleGameOver(p2Id);
+            }, 300);  // Delay game over to ensure TDT message is shown
+            return;
         } else {
-            logEntry = "Third straight double timeout! It's a draw!";
-            handleGameOver(null);
+            logEntry = `Round ${roundNumber}: Third straight double timeout! It's a draw!`;
+            io.emit("update_game_log", logEntry);  // Send the TDT message first
+            io.emit("round_result", {
+                units: { [p1Id]: p1.units, [p2Id]: p2.units },
+                logEntry,
+                isDoubleTimeout: true,
+                roundNumber: roundNumber,
+                isTDT: true  // Flag for triple double timeout
+            });
+            setTimeout(() => {
+                handleGameOver(null);
+            }, 300);  // Delay game over to ensure TDT message is shown
+            return;
         }
     }
 
-    // Emit round result for double timeout
     io.emit("round_result", {
         units: { [p1Id]: p1.units, [p2Id]: p2.units },
         logEntry,
-        isDoubleTimeout: true
+        isDoubleTimeout: true,
+        roundNumber: roundNumber
     });
+    
+    // Reset wagers and start next round if game isn't over
+    p1.wager = null;
+    p2.wager = null;
+    
+    if (!isGameOver) {
+        startTimer();
+    }
+    return;
   }
 
-  // Emit the log entry
   io.emit("update_game_log", logEntry);
 
   if (timedOutPlayer && winningPlayer) {
@@ -235,6 +281,7 @@ function handleTimeout() {
       units: { [p1Id]: p1.units, [p2Id]: p2.units },
       logEntry,
       isDraw: false,
+      roundNumber: roundNumber
     });
   }
 
@@ -283,6 +330,7 @@ function calculateRoundWinner(player1Id, player2Id) {
       units: { [player1Id]: p1.units, [player2Id]: p2.units },
       logEntry,
       isDraw: true,
+      roundNumber: roundNumber
     });
     p1.wager = null;
     p2.wager = null;
@@ -320,6 +368,7 @@ function calculateRoundWinner(player1Id, player2Id) {
     units: { [player1Id]: p1.units, [player2Id]: p2.units },
     logEntry,
     isDraw: false,
+    roundNumber: roundNumber
   });
 
   p1.wager = null;

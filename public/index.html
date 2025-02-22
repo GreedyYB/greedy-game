@@ -27,7 +27,7 @@
     #player-name {
       font-weight: 400;
       font-size: 1.5em;
-      font-family: 'Roboto', sans-serif;
+      font-family: 'Nosifer', cursive;
       margin: 10px 0;
       text-shadow: 1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff;
     }
@@ -113,14 +113,16 @@
     }
 
     #play-again-button {
-      display: none;
-      padding: 10px 20px;
+      padding: 15px 30px;
+      font-size: 1.2em;
       background-color: green;
       color: white;
       border: none;
+      border-radius: 5px;
       cursor: pointer;
+      margin: 20px auto;
+      display: none;
       font-family: 'Roboto', sans-serif;
-      font-size: 16px;
     }
 
     #play-again-button:hover {
@@ -138,6 +140,12 @@
 
     #game-log p {
       margin: 5px 0;
+      font-family: 'Roboto', sans-serif;
+    }
+
+    #game-log p .round-number {
+      color: blue;
+      font-weight: bold;
     }
 
     #wager-limits {
@@ -177,10 +185,11 @@
       text-align: center;
     }
 
-    #round-counter {
+    #round-and-wager {
       font-size: 1.5em;
       font-weight: bold;
-      margin-top: 10px;
+      margin: 10px 0;
+      font-family: 'Roboto', sans-serif;
     }
 
     #game-log-heading {
@@ -203,6 +212,7 @@
       border: 1px solid #ccc;
       border-radius: 5px;
       cursor: pointer;
+      font-family: 'Roboto', sans-serif;
     }
 
     #keypad button:hover {
@@ -228,15 +238,11 @@
       cursor: pointer;
       margin: 20px auto;
       display: block;
+      font-family: 'Roboto', sans-serif;
     }
 
     #place-wager-button:hover {
       background-color: darkgreen;
-    }
-
-    #current-wager {
-      font-size: 1.5em;
-      margin: 10px 0;
     }
 
     /* Media Queries for Responsiveness */
@@ -261,7 +267,7 @@
         font-size: 1.5em;
       }
 
-      #round-counter {
+      #round-and-wager {
         font-size: 1.2em;
       }
 
@@ -274,7 +280,7 @@
         font-size: 1em;
       }
 
-      #place-wager-button {
+      #place-wager-button, #play-again-button {
         padding: 10px 20px;
         font-size: 1em;
       }
@@ -302,11 +308,17 @@
   <!-- Display player name -->
   <h3 id="player-name">Connecting...</h3>
 
-  <!-- Display current wager -->
-  <div id="current-wager">Wager: 0</div>
+  <!-- Combined Round and Wager display -->
+  <div id="round-and-wager">Round 1 Wager: 0</div>
 
-  <!-- Place Wager Button -->
-  <button id="place-wager-button" onclick="showKeypad()">Place Wager</button>
+  <!-- Button container to hold both buttons in the same position -->
+  <div class="button-container">
+    <!-- Place Wager Button -->
+    <button id="place-wager-button" onclick="showKeypad()">Place Wager</button>
+    
+    <!-- Play Again Button -->
+    <button id="play-again-button" onclick="playAgain()">Press me to play again!</button>
+  </div>
 
   <!-- Keypad for wager input -->
   <div id="keypad">
@@ -330,14 +342,12 @@
   <!-- Display wager confirmation message -->
   <div id="wager-confirmation"></div>
 
-  <!-- Round counter and timer display -->
-  <div id="round-counter">Round 1</div>
+  <!-- Timer display -->
   <div id="timer">20</div>
 
   <!-- Game Over Message -->
-  <div id="game-over-message">
+  <div id="game-over-message" style="display: none;">
     <h2 id="end-message"></h2>
-    <button id="play-again-button" onclick="playAgain()">Press me to play again!</button>
   </div>
 
   <!-- Game Log -->
@@ -368,6 +378,7 @@
     let roundNumber = 1;
     let currentWager = 0;
     let consecutiveDoubleTimeouts = 0;
+    let isGameOver = false;
 
     // Function to interpolate between two RGB colors
     function interpolateColor(color1, color2, factor) {
@@ -427,7 +438,7 @@
 
     // Function to update the wager display
     function updateWagerDisplay() {
-      document.getElementById("current-wager").innerText = `Wager: ${currentWager}`;
+      document.getElementById("round-and-wager").innerText = `Round ${roundNumber} Wager: ${currentWager}`;
     }
 
     // Function to lock in the wager
@@ -446,6 +457,43 @@
       placeWagerButton.disabled = true;
 
       socket.emit("place_wager", currentWager);
+    }
+
+    // Function to handle game over state
+    function handleClientGameOver(message) {
+      isGameOver = true;
+
+      // Update the round-and-wager display to show win/lose message
+      document.getElementById("round-and-wager").innerText = message;
+      if (message.includes("won")) {
+        document.getElementById("round-and-wager").style.color = "green";
+      } else if (message.includes("lost")) {
+        document.getElementById("round-and-wager").style.color = "red";
+      }
+
+      // Hide place-wager button and show play-again button in its place
+      document.getElementById("place-wager-button").style.display = "none";
+      document.getElementById("play-again-button").style.display = "block";
+
+      document.getElementById("keypad").style.display = "none";
+      document.getElementById("wager-limits").style.display = "none";
+      document.getElementById("wager-confirmation").style.display = "none";
+
+      // Add game over message to log with a delay
+      setTimeout(() => {
+        const gameLog = document.getElementById("game-log");
+        const logItem = document.createElement("p");
+        logItem.innerText = `Game Over! ${message}`;
+        
+        // Add color styling based on win/lose
+        if (message.includes("won")) {
+          logItem.style.color = "green";
+        } else if (message.includes("lost")) {
+          logItem.style.color = "red";
+        }
+        
+        gameLog.prepend(logItem);
+      }, 300); // Longer delay to ensure it appears after TDT message
     }
 
     // Timer update handler
@@ -473,40 +521,23 @@
       document.getElementById("place-wager-button").disabled = false;
     });
 
+    // Handle update_round event
+    socket.on("update_round", (newRoundNumber) => {
+      roundNumber = newRoundNumber;
+      currentWager = 0; // Reset wager when round number updates
+      updateWagerDisplay();
+    });
+
     // Handle game_over event
     socket.on("game_over", (data) => {
-      const endMessage = document.getElementById("end-message");
-      endMessage.innerText = data.endMessage;
-
-      if (data.endMessage.includes("won")) {
-        endMessage.classList.add("win");
-        endMessage.classList.remove("lose", "waiting-message");
-      } else if (data.endMessage.includes("lost")) {
-        endMessage.classList.add("lose");
-        endMessage.classList.remove("win", "waiting-message");
-      }
-
-      document.getElementById("game-over-message").style.display = "block";
-      document.getElementById("play-again-button").style.display = "inline-block";
-      document.getElementById("place-wager-button").style.display = "none";
-      document.getElementById("keypad").style.display = "none";
-      document.getElementById("wager-limits").style.display = "none";
-      document.getElementById("wager-confirmation").style.display = "none";
-
-      setTimeout(() => {
-        const gameLog = document.getElementById("game-log");
-        const logItem = document.createElement("p");
-        logItem.innerText = `Game Over! ${data.endMessage}`;
-        gameLog.prepend(logItem);
-      }, 100);
+      handleClientGameOver(data.endMessage);
     });
 
     // Handle waiting message
     socket.on("waiting_message", (message) => {
-      const endMessage = document.getElementById("end-message");
-      endMessage.innerText = message;
-      endMessage.classList.remove("win", "lose");
-      endMessage.classList.add("waiting-message");
+      document.getElementById("round-and-wager").innerText = message;
+      document.getElementById("round-and-wager").style.color = "red";
+      document.getElementById("round-and-wager").style.animation = "messageWaitingPulse 1s infinite";
     });
 
     // Handle opponent_locked_wager event
@@ -516,6 +547,19 @@
 
     // Handle round_result event
     socket.on("round_result", (data) => {
+      // Don't process if game is over
+      if (isGameOver) return;
+      
+      // Check if this is a triple double timeout (TDT) round
+      const isTDTRound = data.logEntry && data.logEntry.includes("Third straight double timeout");
+      
+      // If not a TDT or game-ending round, increment the round counter
+      if (!isTDTRound) {
+        roundNumber++;
+        currentWager = 0; // Reset wager to 0 for the new round
+        updateWagerDisplay();
+      }
+      
       const playerUnits = data.units[playerId];
       const opponentUnits = data.units[opponentId];
 
@@ -530,77 +574,147 @@
       document.getElementById("wager-limits").innerText =
         `Minimum wager: ${minWager} units. Maximum wager: ${maxWager} units.`;
 
-      currentWager = 0;
-      updateWagerDisplay();
-
       const placeWagerButton = document.getElementById("place-wager-button");
       placeWagerButton.innerText = "Place Wager";
       placeWagerButton.style.display = "block";
       placeWagerButton.disabled = false;
 
       document.getElementById("wager-confirmation").innerText = "";
-
-      if (!data.isDoubleTimeout) {
-        roundNumber++;
-        consecutiveDoubleTimeouts = 0;
-      }
       
-      document.getElementById("round-counter").innerText = `Round ${roundNumber}`;
-
+      // Process log entries
       if (data.logEntry) {
         const gameLog = document.getElementById("game-log");
         const existingEntries = gameLog.childNodes;
         
+        // Check if this exact message isn't already the most recent entry
         if (existingEntries.length === 0 || existingEntries[0].innerText !== data.logEntry) {
           const logItem = document.createElement("p");
-          logItem.innerText = data.logEntry;
+          
+          // Check if the log entry contains a round number
+          if (data.logEntry.startsWith("Round")) {
+            const [roundPart, ...restParts] = data.logEntry.split(": ");
+            const roundSpan = document.createElement("span");
+            roundSpan.className = "round-number";
+            roundSpan.textContent = roundPart + ": ";
+            logItem.appendChild(roundSpan);
+            logItem.appendChild(document.createTextNode(restParts.join(": ")));
+          } else {
+            logItem.innerText = data.logEntry;
+          }
+          
           gameLog.prepend(logItem);
+          
+          // If this is a TDT round, handle the game over
+          if (isTDTRound) {
+            // Parse the message to determine the winner
+            let winMessage;
+            if (data.logEntry.includes("Player 1 is the winner")) {
+              winMessage = playerId === playerSlots[0] ? "Congratulations, you won!" : "Game over, you lost.";
+            } else if (data.logEntry.includes("Player 2 is the winner")) {
+              winMessage = playerId === playerSlots[1] ? "Congratulations, you won!" : "Game over, you lost.";
+            } else {
+              winMessage = "Game over, it's a draw!";
+            }
+            
+            // Handle game over with a delay to ensure message appears after TDT message
+            setTimeout(() => {
+              handleClientGameOver(winMessage);
+            }, 100);
+          }
+        }
+      }
+    });
+
+    // Handle update_game_log event
+    socket.on("update_game_log", (logEntry) => {
+      const gameLog = document.getElementById("game-log");
+      const existingEntries = gameLog.childNodes;
+      
+      // Check if this is a triple double timeout message
+      const isTDTMessage = logEntry.includes("Third straight double timeout");
+      
+      // Check if this exact message isn't already the most recent entry
+      if (existingEntries.length === 0 || existingEntries[0].innerText !== logEntry) {
+        const logItem = document.createElement("p");
+        
+        // Check if the log entry contains a round number
+        if (logEntry.startsWith("Round")) {
+          const [roundPart, ...restParts] = logEntry.split(": ");
+          const roundSpan = document.createElement("span");
+          roundSpan.className = "round-number";
+          roundSpan.textContent = roundPart + ": ";
+          logItem.appendChild(roundSpan);
+          logItem.appendChild(document.createTextNode(restParts.join(": ")));
+        } else {
+          logItem.innerText = logEntry;
+        }
+        
+        gameLog.prepend(logItem);
+        
+        // If this is a TDT message, handle the game over
+        if (isTDTMessage && !isGameOver) {
+          // Parse the message to determine the winner
+          let winMessage;
+          if (logEntry.includes("Player 1 is the winner")) {
+            winMessage = playerId === playerSlots[0] ? "Congratulations, you won!" : "Game over, you lost.";
+          } else if (logEntry.includes("Player 2 is the winner")) {
+            winMessage = playerId === playerSlots[1] ? "Congratulations, you won!" : "Game over, you lost.";
+          } else {
+            winMessage = "Game over, it's a draw!";
+          }
+          
+          // Handle game over with a delay to ensure message appears after TDT message
+          setTimeout(() => {
+            handleClientGameOver(winMessage);
+          }, 100);
         }
       }
     });
 
     // Handle game_reset_complete event
     socket.on("game_reset_complete", () => {
-  document.getElementById("game-log").innerHTML = "";
-  
-  // Reset player units and colors
-  const playerUnits = document.getElementById("player-units");
-  const opponentUnits = document.getElementById("opponent-units");
-  
-  playerUnits.innerText = "200";
-  opponentUnits.innerText = "200";
-  playerUnits.style.color = "rgb(0, 0, 255)"; // Set to blue
-  
-  document.getElementById("player-bar").style.width = "50%";
-  document.getElementById("player-bar").style.backgroundColor = "rgb(0, 0, 255)"; // Set to blue
-  
-  document.getElementById("game-over-message").style.display = "none";
-  document.getElementById("play-again-button").style.display = "none";
-  document.getElementById("timer").classList.remove("red");
+      document.getElementById("game-log").innerHTML = "";
+      
+      // Reset player units and colors
+      const playerUnits = document.getElementById("player-units");
+      const opponentUnits = document.getElementById("opponent-units");
+      
+      playerUnits.innerText = "200";
+      opponentUnits.innerText = "200";
+      playerUnits.style.color = "rgb(0, 0, 255)"; // Set to blue
+      
+      document.getElementById("player-bar").style.width = "50%";
+      document.getElementById("player-bar").style.backgroundColor = "rgb(0, 0, 255)"; // Set to blue
+      
+      // Reset round-and-wager display
+      document.getElementById("round-and-wager").innerText = "Round 1 Wager: 0";
+      document.getElementById("round-and-wager").style.color = ""; // Reset to default color
+      document.getElementById("round-and-wager").style.animation = "none";
+      
+      // Switch back the buttons
+      document.getElementById("place-wager-button").style.display = "block";
+      document.getElementById("play-again-button").style.display = "none";
+      
+      document.getElementById("timer").classList.remove("red");
 
-  const endMessage = document.getElementById("end-message");
-  endMessage.classList.remove("waiting-message");
+      minWager = 10;
+      maxWager = 200;
+      document.getElementById("wager-limits").innerText =
+        "Minimum wager: 10 units. Maximum wager: 200 units.";
 
-  minWager = 10;
-  maxWager = 200;
-  document.getElementById("wager-limits").innerText =
-    "Minimum wager: 10 units. Maximum wager: 200 units.";
+      currentWager = 0;
+      roundNumber = 1;
+      consecutiveDoubleTimeouts = 0;
+      isGameOver = false;
+      updateWagerDisplay();
 
-  currentWager = 0;
-  updateWagerDisplay();
+      const placeWagerButton = document.getElementById("place-wager-button");
+      placeWagerButton.innerText = "Place Wager";
+      placeWagerButton.disabled = false;
 
-  const placeWagerButton = document.getElementById("place-wager-button");
-  placeWagerButton.innerText = "Place Wager";
-  placeWagerButton.style.display = "block";
-  placeWagerButton.disabled = false;
-
-  document.getElementById("wager-limits").style.display = "block";
-  document.getElementById("wager-confirmation").style.display = "block";
-  
-  roundNumber = 1;
-  consecutiveDoubleTimeouts = 0;
-  document.getElementById("round-counter").innerText = `Round ${roundNumber}`;
-});
+      document.getElementById("wager-limits").style.display = "block";
+      document.getElementById("wager-confirmation").style.display = "block";
+    });
 
     // Handle disable_wager_input event
     socket.on("disable_wager_input", () => {
@@ -619,4 +733,4 @@
     }
   </script>
 </body>
-</html> 
+</html>
