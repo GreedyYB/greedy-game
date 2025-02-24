@@ -32,8 +32,36 @@ let timerInterval = null;
 let isGameOver = false;
 let consecutiveDoubleTimeouts = 0;
 const playerReady = new Set();
+let gameInactivityTimeout = null;
+const INACTIVITY_TIMEOUT = 2 * 60 * 1000;
+let currentGameId = null;
+let timerState = {
+  isRunning: false,
+  timeRemaining: 20,
+  gameId: null
+};
+
+function cleanupGame() {
+  clearInterval(timerInterval);
+  clearTimeout(gameInactivityTimeout);
+  timerState = {
+    isRunning: false,
+    timeRemaining: 0,
+    gameId: null
+  };
+  currentGameId = null;
+  isGameOver = true;
+  
+  io.emit("game_cleanup", {
+    message: "Game cleaned up due to inactivity"
+  });
+}
 
 function resetGameState() {
+  clearInterval(timerInterval);
+  clearTimeout(gameInactivityTimeout);
+  currentGameId = Date.now().toString();
+  
   Object.keys(players).forEach((id) => {
     players[id].units = 200;
     players[id].wager = null;
@@ -42,14 +70,23 @@ function resetGameState() {
   isGameOver = false;
   consecutiveDoubleTimeouts = 0;
   playerReady.clear();
-  clearInterval(timerInterval);
-  io.emit("game_reset_complete");
+  
+  io.emit("game_reset_complete", { 
+    gameId: currentGameId,
+    timestamp: Date.now()
+  });
   startTimer();
   io.emit("enable_wager_input");
 }
 
 io.on("connection", (socket) => {
   console.log("A player connected:", socket.id);
+
+  let lastHeartbeat = Date.now();
+  
+  socket.on("heartbeat", () => {
+    lastHeartbeat = Date.now();
+  });
 
   let assignedSlot = null;
   if (!playerSlots[0]) {
@@ -141,22 +178,44 @@ io.on("connection", (socket) => {
       playerSlots[slotIndex] = null;
       delete players[socket.id];
       playerReady.delete(socket.id);
-    }
-    io.emit("player_left", { id: socket.id });
-    if (!playerSlots[0] || !playerSlots[1]) {
-      resetGameState();
+      
+      if (!playerSlots[0] && !playerSlots[1]) {
+        cleanupGame();
+      }
     }
   });
 });
 
 function startTimer() {
-  let timeRemaining = 20;
-  io.emit("update_timer", timeRemaining);
+  clearInterval(timerInterval);
+  
+  if (!currentGameId) {
+    currentGameId = Date.now().toString();
+  }
+  
+  timerState = {
+    isRunning: true,
+    timeRemaining: 20,
+    gameId: currentGameId
+  };
+  
+  io.emit("timer_sync", {
+    timeRemaining: timerState.timeRemaining,
+    gameId: timerState.gameId
+  });
+  
   timerInterval = setInterval(() => {
-    timeRemaining--;
-    io.emit("update_timer", timeRemaining);
-    if (timeRemaining <= 0) {
+    if (timerState.timeRemaining > 0) {
+      timerState.timeRemaining--;
+      io.emit("timer_sync", {
+        timeRemaining: timerState.timeRemaining,
+        gameId: timerState.gameId
+      });
+    }
+    
+    if (timerState.timeRemaining <= 0) {
       clearInterval(timerInterval);
+      timerState.isRunning = false;
       handleTimeout();
     }
   }, 1000);
@@ -169,7 +228,6 @@ function handleTimeout() {
 
   if (!p1 || !p2) return;
 
-  // Increment round number at the start for all timeout scenarios
   roundNumber++;
 
   let timedOutPlayer = null;
@@ -192,7 +250,6 @@ function handleTimeout() {
   } else if (p1.wager === null && p2.wager === null) {
     consecutiveDoubleTimeouts++;
     
-    // Determine who's leading
     let leadingPlayer = null;
     if (p1.units > p2.units) {
         leadingPlayer = p1;
@@ -200,185 +257,191 @@ function handleTimeout() {
         leadingPlayer = p2;
     }
     
-    // Create appropriate message based on consecutive timeouts
     if (consecutiveDoubleTimeouts === 1) {
-        logEntry = `Round ${roundNumber}: Double timeout! 3 in a row ends the game. ${leadingPlayer ? `${leadingPlayer.name} leads` : 'Units even'}`;
+        logEntry = `Round ${roundNumber}: Double timeout! Three in a row ends the game. ${leadingPlayer ? `${leadingPlayer.name} is leading` : 'Units even'}`;
     } else if (consecutiveDoubleTimeouts === 2) {
         if (p1.units === p2.units) {
-            logEntry = `Round ${roundNumber}: Second double timeout in a row! One more: Draw`;
+            logEntry = `Round ${roundNumber}: That's two double timeouts in a row! One more and it's a draw!`;
         } else {
-            logEntry = `Round ${roundNumber}: Second double timeout in a row! One more: ${leadingPlayer.name} wins`;
+            logEntry = `Round ${roundNumber}: That's two double timeouts in a row! One more and ${leadingPlayer.name} wins!`;
         }
     } else if (consecutiveDoubleTimeouts === 3) {
         if (p1.units > p2.units) {
-            logEntry = `Round ${roundNumber}: Third straight double timeout! ${p1.name} wins!`;
-            io.emit("update_game_log", logEntry);  // Send the TDT message first
+            logEntry = `Round ${roundNumber}: Third straight double timeout! ${p1.name} is the winner!`;
+            io.emit("update_game_log", logEntry);
             io.emit("round_result", {
                 units: { [p1Id]: p1.units, [p2Id]: p2.units },
                 logEntry,
                 isDoubleTimeout: true,
                 roundNumber: roundNumber,
-                isTDT: true  // Flag for triple double timeout
+                isTDT: true
             });
             setTimeout(() => {
                 handleGameOver(p1Id);
-            }, 300);  // Delay game over to ensure TDT message is shown
+            }, 300);
             return;
         } else if (p2.units > p1.units) {
-            logEntry = `Round ${roundNumber}: Third straight double timeout! ${p2.name} wins!`;
-            io.emit("update_game_log", logEntry);  // Send the TDT message first
+            logEntry = `Round ${roundNumber}: Third straight double timeout! ${p2.name} is the winner!`;
+            io.emit("update_game_log", logEntry);
             io.emit("round_result", {
                 units: { [p1Id]: p1.units, [p2Id]: p2.units },
                 logEntry,
                 isDoubleTimeout: true,
                 roundNumber: roundNumber,
-                isTDT: true  // Flag for triple double timeout
+                isTDT: true
             });
             setTimeout(() => {
                 handleGameOver(p2Id);
-            }, 300);  // Delay game over to ensure TDT message is shown
+            }, 300);
             return;
         } else {
             logEntry = `Round ${roundNumber}: Third straight double timeout! It's a draw!`;
-            io.emit("update_game_log", logEntry);  // Send the TDT message first
+            io.emit("update_game_log", logEntry);
             io.emit("round_result", {
                 units: { [p1Id]: p1.units, [p2Id]: p2.units },
                 logEntry,
                 isDoubleTimeout: true,
                 roundNumber: roundNumber,
-                isTDT: true  // Flag for triple double timeout
+                isTDT: true
             });
             setTimeout(() => {
                 handleGameOver(null);
-            }, 300);  // Delay game over to ensure TDT message is shown
+            }, 300);
             return;
         }
     }
 
     io.emit("round_result", {
-        units: { [p1Id]: p1.units, [p2Id]: p2.units },
-        logEntry,
-        isDoubleTimeout: true,
-        roundNumber: roundNumber
-    });
-    
-    // Reset wagers and start next round if game isn't over
-    p1.wager = null;
-    p2.wager = null;
-    
-    if (!isGameOver) {
-        startTimer();
-    }
-    return;
-  }
-
-  io.emit("update_game_log", logEntry);
-
-  if (timedOutPlayer && winningPlayer) {
-    timedOutPlayer.units -= lostUnits;
-    winningPlayer.units += lostUnits;
-    io.emit("round_result", {
       units: { [p1Id]: p1.units, [p2Id]: p2.units },
       logEntry,
-      isDraw: false,
+      isDoubleTimeout: true,
       roundNumber: roundNumber
-    });
-  }
-
+  });
+  
   p1.wager = null;
   p2.wager = null;
-
-  if (p1.units < 20 || p2.units < 20) {
-    const winnerId = p1.units >= 20 ? p1Id : p2Id;
-    handleGameOver(winnerId);
-  } else if (!isGameOver) {
-    startTimer();
+  
+  if (!isGameOver) {
+      startTimer();
   }
+  return;
 }
 
-function handleGameOver(winnerId) {
-  const p1Id = playerSlots[0];
-  const p2Id = playerSlots[1];
+io.emit("update_game_log", logEntry);
 
-  let endMessage = "";
-  if (winnerId === p1Id) {
-    io.to(p1Id).emit("game_over", { endMessage: "Congratulations, you won!" });
-    io.to(p2Id).emit("game_over", { endMessage: "Game over, you lost." });
-  } else if (winnerId === p2Id) {
-    io.to(p2Id).emit("game_over", { endMessage: "Congratulations, you won!" });
-    io.to(p1Id).emit("game_over", { endMessage: "Game over, you lost." });
-  } else {
-    io.emit("game_over", { endMessage: "Game over, it's a draw!" });
-  }
-
-  io.emit("disable_wager_input");
-  clearInterval(timerInterval);
-  io.emit("update_timer", 0);
-  isGameOver = true;
-}
-
-function calculateRoundWinner(player1Id, player2Id) {
-  const p1 = players[player1Id];
-  const p2 = players[player2Id];
-  roundNumber++;
-
-  let logEntry = `Round ${roundNumber}: ${p1.name} wagered ${p1.wager}, ${p2.name} wagered ${p2.wager}. `;
-
-  if (p1.wager === p2.wager) {
-    logEntry += `It's a draw!`;
-    io.emit("round_result", {
-      units: { [player1Id]: p1.units, [player2Id]: p2.units },
-      logEntry,
-      isDraw: true,
-      roundNumber: roundNumber
-    });
-    p1.wager = null;
-    p2.wager = null;
-    consecutiveDoubleTimeouts = 0;
-    startTimer();
-    return;
-  }
-
-  let winner;
-  let logNote = "";
-
-  if (p1.wager > p2.wager * 4) {
-    winner = p2;
-    logNote = "due to the '400% rule'";
-    p2.units += p1.wager;
-    p1.units -= p1.wager;
-  } else if (p2.wager > p1.wager * 4) {
-    winner = p1;
-    logNote = "due to the '400% rule'";
-    p1.units += p2.wager;
-    p2.units -= p2.wager;
-  } else {
-    winner = p1.wager > p2.wager ? p1 : p2;
-    if (winner === p1) {
-      p1.units += p2.wager;
-      p2.units -= p2.wager;
-    } else {
-      p2.units += p1.wager;
-      p1.units -= p1.wager;
-    }
-  }
-
-  logEntry += `${winner.name} wins ${logNote ? logNote : ""}!`;
+if (timedOutPlayer && winningPlayer) {
+  timedOutPlayer.units -= lostUnits;
+  winningPlayer.units += lostUnits;
   io.emit("round_result", {
-    units: { [player1Id]: p1.units, [player2Id]: p2.units },
+    units: { [p1Id]: p1.units, [p2Id]: p2.units },
     logEntry,
     isDraw: false,
     roundNumber: roundNumber
   });
+}
 
+p1.wager = null;
+p2.wager = null;
+
+if (p1.units < 20 || p2.units < 20) {
+  const winnerId = p1.units >= 20 ? p1Id : p2Id;
+  handleGameOver(winnerId);
+} else if (!isGameOver) {
+  startTimer();
+}
+}
+
+function handleGameOver(winnerId) {
+const p1Id = playerSlots[0];
+const p2Id = playerSlots[1];
+
+clearInterval(timerInterval);
+clearTimeout(gameInactivityTimeout);
+timerState.isRunning = false;
+
+let endMessage = "";
+if (winnerId === p1Id) {
+  io.to(p1Id).emit("game_over", { endMessage: "Congratulations, you won!" });
+  io.to(p2Id).emit("game_over", { endMessage: "Game over, you lost." });
+} else if (winnerId === p2Id) {
+  io.to(p2Id).emit("game_over", { endMessage: "Congratulations, you won!" });
+  io.to(p1Id).emit("game_over", { endMessage: "Game over, you lost." });
+} else {
+  io.emit("game_over", { endMessage: "Game over, it's a draw!" });
+}
+
+io.emit("disable_wager_input");
+io.emit("timer_sync", { timeRemaining: 0, gameId: currentGameId });
+isGameOver = true;
+
+gameInactivityTimeout = setTimeout(() => {
+  cleanupGame();
+}, INACTIVITY_TIMEOUT);
+}
+
+function calculateRoundWinner(player1Id, player2Id) {
+const p1 = players[player1Id];
+const p2 = players[player2Id];
+roundNumber++;
+
+let logEntry = `Round ${roundNumber}: ${p1.name} wagered ${p1.wager}, ${p2.name} wagered ${p2.wager}. `;
+
+if (p1.wager === p2.wager) {
+  logEntry += `It's a draw!`;
+  io.emit("round_result", {
+    units: { [player1Id]: p1.units, [player2Id]: p2.units },
+    logEntry,
+    isDraw: true,
+    roundNumber: roundNumber
+  });
   p1.wager = null;
   p2.wager = null;
   consecutiveDoubleTimeouts = 0;
+  startTimer();
+  return;
+}
 
-  if (p1.units < 20 || p2.units < 20) {
-    const winnerId = p1.units >= 20 ? player1Id : player2Id;
-    handleGameOver(winnerId);
+let winner;
+let logNote = "";
+
+if (p1.wager > p2.wager * 4) {
+  winner = p2;
+  logNote = "due to the '400% rule'";
+  p2.units += p1.wager;
+  p1.units -= p1.wager;
+} else if (p2.wager > p1.wager * 4) {
+  winner = p1;
+  logNote = "due to the '400% rule'";
+  p1.units += p2.wager;
+  p2.units -= p2.wager;
+} else {
+  winner = p1.wager > p2.wager ? p1 : p2;
+  if (winner === p1) {
+    p1.units += p2.wager;
+    p2.units -= p2.wager;
   } else {
-    startTimer();
+    p2.units += p1.wager;
+    p1.units -= p1.wager;
   }
 }
+
+logEntry += `${winner.name} wins ${logNote ? logNote : ""}!`;
+io.emit("round_result", {
+  units: { [player1Id]: p1.units, [player2Id]: p2.units },
+  logEntry,
+  isDraw: false,
+  roundNumber: roundNumber
+});
+
+p1.wager = null;
+p2.wager = null;
+consecutiveDoubleTimeouts = 0;
+
+if (p1.units < 20 || p2.units < 20) {
+  const winnerId = p1.units >= 20 ? player1Id : player2Id;
+  handleGameOver(winnerId);
+} else {
+  startTimer();
+}
+}
+

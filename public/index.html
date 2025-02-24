@@ -363,14 +363,6 @@
       reconnectionAttempts: 99999
     });
 
-    socket.on('connect', () => {
-      console.log('Connected to server');
-    });
-
-    socket.on('connect_error', (error) => {
-      console.log('Connection error:', error);
-    });
-
     let playerId = null;
     let opponentId = null;
     let minWager = 10;
@@ -379,6 +371,19 @@
     let currentWager = 0;
     let consecutiveDoubleTimeouts = 0;
     let isGameOver = false;
+    let currentGameId = null;
+    let lastTimerUpdate = Date.now();
+    let heartbeatInterval = null;
+    let lastServerTimestamp = null;
+
+    socket.on('connect', () => {
+      console.log('Connected to server');
+      startHeartbeat();
+    });
+
+    socket.on('connect_error', (error) => {
+      console.log('Connection error:', error);
+    });
 
     // Function to interpolate between two RGB colors
     function interpolateColor(color1, color2, factor) {
@@ -411,6 +416,16 @@
       const playerUnits = document.getElementById("player-units");
       playerBar.style.backgroundColor = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
       playerUnits.style.color = `rgb(${color[0]}, ${color[1]}, ${color[2]})`;
+    }
+
+    function startHeartbeat() {
+      if (heartbeatInterval) {
+        clearInterval(heartbeatInterval);
+      }
+      
+      heartbeatInterval = setInterval(() => {
+        socket.emit("heartbeat");
+      }, 30000); // Send heartbeat every 30 seconds
     }
 
     // Function to show the keypad
@@ -493,19 +508,61 @@
         }
         
         gameLog.prepend(logItem);
-      }, 300); // Longer delay to ensure it appears after TDT message
+      }, 300);
     }
 
     // Timer update handler
-    socket.on("update_timer", (timeRemaining) => {
-      const timerElement = document.getElementById("timer");
-      timerElement.innerText = timeRemaining;
+    socket.on("timer_sync", (data) => {
+      // Ignore updates from old game sessions
+      if (currentGameId && data.gameId !== currentGameId) {
+        console.log("Ignoring timer update from old game session");
+        return;
+      }
       
-      if (timeRemaining <= 10) {
-        timerElement.classList.add("red");
-      } else {
+      // Update current game ID if needed
+      currentGameId = data.gameId;
+      
+      // Prevent rapid timer updates
+      const now = Date.now();
+      if (now - lastTimerUpdate < 900) { // Allow for some network delay
+        return;
+      }
+      lastTimerUpdate = now;
+      
+      const timerElement = document.getElementById("timer");
+      if (timerElement) {
+        timerElement.innerText = Math.max(0, data.timeRemaining);
+        
+        if (data.timeRemaining <= 10) {
+          timerElement.classList.add("red");
+        } else {
+          timerElement.classList.remove("red");
+        }
+      }
+    });
+
+    // Handle game cleanup event
+    socket.on("game_cleanup", (data) => {
+      // Clear local timers and intervals
+      clearInterval(heartbeatInterval);
+      
+      // Reset game state
+      currentGameId = null;
+      lastTimerUpdate = 0;
+      
+      // Reset UI
+      const timerElement = document.getElementById("timer");
+      if (timerElement) {
+        timerElement.innerText = "0";
         timerElement.classList.remove("red");
       }
+      
+      document.getElementById("place-wager-button").disabled = true;
+      document.getElementById("keypad").style.display = "none";
+      
+      // Show cleanup message
+      document.getElementById("round-and-wager").innerText = "Game inactive. Click 'Play Again' to start a new game.";
+      document.getElementById("play-again-button").style.display = "block";
     });
 
     // Handle assign_name event
@@ -606,16 +663,6 @@
           
           // If this is a TDT round, handle the game over
           if (isTDTRound) {
-            // Parse the message to determine the winner
-            let winMessage;
-            if (data.logEntry.includes("Player 1 is the winner")) {
-              winMessage = playerId === playerSlots[0] ? "Congratulations, you won!" : "Game over, you lost.";
-            } else if (data.logEntry.includes("Player 2 is the winner")) {
-              winMessage = playerId === playerSlots[1] ? "Congratulations, you won!" : "Game over, you lost.";
-            } else {
-              winMessage = "Game over, it's a draw!";
-            }
-            
             // Handle game over with a delay to ensure message appears after TDT message
             setTimeout(() => {
               handleClientGameOver(winMessage);
@@ -625,54 +672,18 @@
       }
     });
 
-    // Handle update_game_log event
-    socket.on("update_game_log", (logEntry) => {
-      const gameLog = document.getElementById("game-log");
-      const existingEntries = gameLog.childNodes;
-      
-      // Check if this is a triple double timeout message
-      const isTDTMessage = logEntry.includes("Third straight double timeout");
-      
-      // Check if this exact message isn't already the most recent entry
-      if (existingEntries.length === 0 || existingEntries[0].innerText !== logEntry) {
-        const logItem = document.createElement("p");
-        
-        // Check if the log entry contains a round number
-        if (logEntry.startsWith("Round")) {
-          const [roundPart, ...restParts] = logEntry.split(": ");
-          const roundSpan = document.createElement("span");
-          roundSpan.className = "round-number";
-          roundSpan.textContent = roundPart + ": ";
-          logItem.appendChild(roundSpan);
-          logItem.appendChild(document.createTextNode(restParts.join(": ")));
-        } else {
-          logItem.innerText = logEntry;
-        }
-        
-        gameLog.prepend(logItem);
-        
-        // If this is a TDT message, handle the game over
-        if (isTDTMessage && !isGameOver) {
-          // Parse the message to determine the winner
-          let winMessage;
-          if (logEntry.includes("Player 1 is the winner")) {
-            winMessage = playerId === playerSlots[0] ? "Congratulations, you won!" : "Game over, you lost.";
-          } else if (logEntry.includes("Player 2 is the winner")) {
-            winMessage = playerId === playerSlots[1] ? "Congratulations, you won!" : "Game over, you lost.";
-          } else {
-            winMessage = "Game over, it's a draw!";
-          }
-          
-          // Handle game over with a delay to ensure message appears after TDT message
-          setTimeout(() => {
-            handleClientGameOver(winMessage);
-          }, 100);
-        }
-      }
-    });
-
     // Handle game_reset_complete event
-    socket.on("game_reset_complete", () => {
+    socket.on("game_reset_complete", (data) => {
+      // Validate timestamp to prevent stale resets
+      if (lastServerTimestamp && data.timestamp < lastServerTimestamp) {
+        console.log("Ignoring stale game reset");
+        return;
+      }
+      
+      lastServerTimestamp = data.timestamp;
+      currentGameId = data.gameId;
+      startHeartbeat();
+      
       document.getElementById("game-log").innerHTML = "";
       
       // Reset player units and colors
@@ -681,17 +692,15 @@
       
       playerUnits.innerText = "200";
       opponentUnits.innerText = "200";
-      playerUnits.style.color = "rgb(0, 0, 255)"; // Set to blue
+      playerUnits.style.color = "rgb(0, 0, 255)";
       
       document.getElementById("player-bar").style.width = "50%";
-      document.getElementById("player-bar").style.backgroundColor = "rgb(0, 0, 255)"; // Set to blue
+      document.getElementById("player-bar").style.backgroundColor = "rgb(0, 0, 255)";
       
-      // Reset round-and-wager display
       document.getElementById("round-and-wager").innerText = "Round 1 Wager: 0";
-      document.getElementById("round-and-wager").style.color = ""; // Reset to default color
+      document.getElementById("round-and-wager").style.color = "";
       document.getElementById("round-and-wager").style.animation = "none";
       
-      // Switch back the buttons
       document.getElementById("place-wager-button").style.display = "block";
       document.getElementById("play-again-button").style.display = "none";
       
