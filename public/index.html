@@ -385,7 +385,7 @@
   <div id="wager-confirmation"></div>
 
   <!-- Timer display -->
-  <div id="timer">20</div>
+  <div id="timer">60</div>
 
   <!-- Game Over Message -->
  
@@ -575,7 +575,7 @@ socket.on("timer_sync", (data) => {
   if (timerElement) {
     // Force immediate update if it's a round reset
     if (data.forceReset) {
-      timerElement.innerText = "20";
+      timerElement.innerText = "60";
       lastTimerUpdate = 0;  // Reset the throttle
     } else {
       // Normal timer update with throttling

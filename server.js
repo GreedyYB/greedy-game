@@ -37,7 +37,7 @@ const INACTIVITY_TIMEOUT = 2 * 60 * 1000;
 let currentGameId = null;
 let timerState = {
   isRunning: false,
-  timeRemaining: 20,
+  timeRemaining: 60,
   gameId: null
 };
 
@@ -195,7 +195,7 @@ function startTimer() {
   
   timerState = {
     isRunning: true,
-    timeRemaining: 20,
+    timeRemaining: 60,
     gameId: currentGameId
   };
   
@@ -405,9 +405,9 @@ function calculateRoundWinner(player1Id, player2Id) {
     
     // Reset timer after processing wagers
     clearInterval(timerInterval);
-    timerState.timeRemaining = 20;
+    timerState.timeRemaining = 60;
     io.emit("timer_sync", { 
-      timeRemaining: 20, 
+      timeRemaining: 60, 
       gameId: currentGameId,
       forceReset: true
     });
@@ -457,9 +457,9 @@ function calculateRoundWinner(player1Id, player2Id) {
   } else {
     // Reset timer after processing wagers
     clearInterval(timerInterval);
-    timerState.timeRemaining = 20;
+    timerState.timeRemaining = 60;
     io.emit("timer_sync", { 
-      timeRemaining: 20, 
+      timeRemaining: 60, 
       gameId: currentGameId,
       forceReset: true
     });
