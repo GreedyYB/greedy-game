@@ -25,19 +25,77 @@
     }
 
     #player-name {
-      font-weight: 400;
-      font-size: 1.5em;
-      font-family: 'Nosifer', cursive;
-      margin: 10px 0;
-      text-shadow: 1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff;
+  font-weight: 900;
+  font-size: 1.5em;
+  font-family: 'Roboto Black', sans-serif;
+  margin: 10px 0;
+  text-shadow: 1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff;
+} /* Remove the extra closing brace after this */
+
+.player-labels-container {
+  display: flex;
+  justify-content: space-between;
+  width: 100%;
+  max-width: 800px;
+  margin: 0 auto;
+  position: relative;
+}
+
+.you-label {
+  position: absolute;
+  left: 50px; /* Adjust based on your status-label width */
+  transform: translateX(-50%);
+}
+
+.enemy-label {
+  position: absolute;
+  right: 50px; /* Adjust based on your opponent-units position */
+  transform: translateX(50%);
+}
     }
 
+    /* Replace your current color classes with these */
+.player-label.you-color {
+  color: green !important;
+}
+
+.player-label.enemy-color {
+  color: red !important;
+}
+
     .status-container {
-      display: flex;
-      align-items: center;
-      margin-bottom: 10px;
-      justify-content: center;
-    }
+  display: flex;
+  align-items: flex-start; /* Keep scores at the top aligned */
+  margin-bottom: 20px;
+  justify-content: center;
+}
+
+    /* Add this new rule */
+.status-column {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  position: relative; /* Add this */
+}
+
+/* And modify this rule for more precise control */
+.status-column:last-child .player-label {
+  margin-top: 8px;
+  position: absolute; /* Change from relative to absolute */
+  top: 35px; /* Explicit positioning - adjust this value as needed */
+  left: 50%;
+  transform: translateX(-50%);
+}
+
+/* Also add this rule for the first column */
+.status-column:first-child .player-label {
+  margin-top: 8px;
+  position: absolute;
+  top: 35px; /* Same value as the other label */
+  left: 50%;
+  transform: translateX(-50%);
+}
+
 
     .status-label {
       width: 50px;
@@ -50,7 +108,7 @@
 
     .status-bar {
       width: 60%;
-      height: 40px;
+      height: 28px;
       background-color: #fdf6f6;
       position: relative;
       border: 2px solid black;
@@ -72,12 +130,12 @@
       background-color: rgba(0, 0, 0, 0.3);
     }
 
-    .opponent-units {
-      margin-left: 10px;
-      font-weight: bold;
-      font-family: 'Roboto', sans-serif;
-      color: black;
-    }
+    .enemy-units {
+  margin-left: 10px;
+  font-weight: bold;
+  font-family: 'Roboto', sans-serif;
+  color: black;
+}
 
   
     @keyframes messageWaitingPulse {
@@ -154,11 +212,18 @@
     }
 
     .player-label {
-      font-weight: bold;
-      font-family: 'Roboto', sans-serif;
-      margin-top: 10px;
-      text-align: center;
-    }
+  font-weight: bold;
+  font-family: 'Roboto', sans-serif;
+  margin-top: 8px;
+  text-align: center;
+  font-size: 1.8em;
+}
+
+.status-column:last-child .player-label {
+  margin-top: 8px;
+  position: relative;
+  top: 0;
+}
 
     #round-and-wager {
       font-size: 1.5em;
@@ -267,17 +332,19 @@
 
   <!-- Status bar for the current player -->
   <div class="status-container">
-    <div class="status-label" id="player-units">200</div>
+    <div class="status-column">
+      <div class="status-label" id="player-units">200</div>
+      <div class="player-label you-color">YOU</div>
+    </div>
+    
     <div class="status-bar">
       <div class="status-fill" id="player-bar" style="width: 50%;"></div>
     </div>
-    <div class="opponent-units" id="opponent-units">200</div>
-  </div>
-
-  <!-- Player vs opponent labels -->
-  <div style="display: flex; justify-content: space-between; width: 460px; margin: 0 auto;">
-    <div class="player-label" style="text-align: left;">YOU</div>
-    <div class="player-label" style="text-align: right;">OPPONENT</div>
+    
+    <div class="status-column">
+      <div class="enemy-units" id="enemy-units">200</div>
+      <div class="player-label enemy-color">ENEMY</div>
+    </div>
   </div>
 
   <!-- Display player name -->
@@ -616,7 +683,7 @@ socket.on("round_result", (data) => {
 
   document.getElementById("player-units").innerText = playerUnits || "0";
   document.getElementById("player-bar").style.width = `${(playerUnits / 400) * 100}%`;
-  document.getElementById("opponent-units").innerText = opponentUnits || "0";
+  document.getElementById("enemy-units").innerText = opponentUnits || "0";
 
   updateColors(playerUnits);
 
@@ -674,10 +741,10 @@ socket.on("round_result", (data) => {
       
       // Reset player units and colors
       const playerUnits = document.getElementById("player-units");
-      const opponentUnits = document.getElementById("opponent-units");
+const enemyUnits = document.getElementById("enemy-units");
       
       playerUnits.innerText = "200";
-      opponentUnits.innerText = "200";
+      enemyUnits.innerText = "200";
       playerUnits.style.color = "rgb(0, 0, 255)";
       
       document.getElementById("player-bar").style.width = "50%";
