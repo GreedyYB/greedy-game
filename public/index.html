@@ -79,39 +79,14 @@
       color: black;
     }
 
-    #game-over-message {
-      text-align: center;
-      margin-top: 20px;
-      display: none;
-    }
-
-    #game-over-message h2 {
-      margin-bottom: 10px;
-      font-size: 2em;
-      font-weight: bold;
-    }
-
-    #game-over-message h2.win {
-      color: green;
-    }
-
-    #game-over-message h2.lose {
-      color: red;
-    }
-
+  
     @keyframes messageWaitingPulse {
       0% { opacity: 1; }
       50% { opacity: 0.5; }
       100% { opacity: 1; }
     }
 
-    #game-over-message h2.waiting-message {
-      color: red !important;
-      font-size: 1em !important;
-      animation: messageWaitingPulse 1s infinite;
-      font-weight: bold;
-    }
-
+    
     #play-again-button {
       padding: 15px 30px;
       font-size: 1.2em;
@@ -346,10 +321,7 @@
   <div id="timer">20</div>
 
   <!-- Game Over Message -->
-  <div id="game-over-message" style="display: none;">
-    <h2 id="end-message"></h2>
-  </div>
-
+ 
   <!-- Game Log -->
   <h3 id="game-log-heading">Game Log:</h3>
   <div id="game-log"></div>
@@ -377,12 +349,10 @@
     let lastServerTimestamp = null;
 
     socket.on('connect', () => {
-      console.log('Connected to server');
       startHeartbeat();
     });
 
     socket.on('connect_error', (error) => {
-      console.log('Connection error:', error);
     });
 
     // Function to interpolate between two RGB colors
@@ -476,70 +446,89 @@
 
     // Function to handle game over state
     function handleClientGameOver(message) {
-      isGameOver = true;
+  isGameOver = true;
 
-      // Update the round-and-wager display to show win/lose message
-      document.getElementById("round-and-wager").innerText = message;
+  // Update the round-and-wager display to show win/lose message
+  document.getElementById("round-and-wager").innerText = message;
+  if (message.includes("won")) {
+    document.getElementById("round-and-wager").style.color = "green";
+  } else if (message.includes("lost")) {
+    document.getElementById("round-and-wager").style.color = "red";
+  }
+
+  // Ensure timer shows 0 and is red
+  const timerElement = document.getElementById("timer");
+  timerElement.innerText = "0";
+  timerElement.classList.add("red");
+
+  // Hide place-wager button and show play-again button in its place
+  document.getElementById("place-wager-button").style.display = "none";
+  document.getElementById("play-again-button").style.display = "block";
+
+  document.getElementById("keypad").style.display = "none";
+  document.getElementById("wager-limits").style.display = "none";
+  document.getElementById("wager-confirmation").style.display = "none";
+
+  // Add game over message to log with a delay
+  setTimeout(() => {
+    const gameLog = document.getElementById("game-log");
+    const gameOverMessage = `Game Over! ${message}`;
+    
+    // Check if this exact message is already the most recent entry
+    const existingEntries = gameLog.childNodes;
+    if (existingEntries.length === 0 || existingEntries[0].innerText !== gameOverMessage) {
+      const logItem = document.createElement("p");
+      logItem.innerText = gameOverMessage;
+      
+      // Add color styling based on win/lose
       if (message.includes("won")) {
-        document.getElementById("round-and-wager").style.color = "green";
+        logItem.style.color = "green";
       } else if (message.includes("lost")) {
-        document.getElementById("round-and-wager").style.color = "red";
+        logItem.style.color = "red";
       }
-
-      // Hide place-wager button and show play-again button in its place
-      document.getElementById("place-wager-button").style.display = "none";
-      document.getElementById("play-again-button").style.display = "block";
-
-      document.getElementById("keypad").style.display = "none";
-      document.getElementById("wager-limits").style.display = "none";
-      document.getElementById("wager-confirmation").style.display = "none";
-
-      // Add game over message to log with a delay
-      setTimeout(() => {
-        const gameLog = document.getElementById("game-log");
-        const logItem = document.createElement("p");
-        logItem.innerText = `Game Over! ${message}`;
-        
-        // Add color styling based on win/lose
-        if (message.includes("won")) {
-          logItem.style.color = "green";
-        } else if (message.includes("lost")) {
-          logItem.style.color = "red";
-        }
-        
-        gameLog.prepend(logItem);
-      }, 300);
+      
+      gameLog.prepend(logItem);
     }
+  }, 300);
+}
 
-    // Timer update handler
-    socket.on("timer_sync", (data) => {
-      // Ignore updates from old game sessions
-      if (currentGameId && data.gameId !== currentGameId) {
-        console.log("Ignoring timer update from old game session");
-        return;
-      }
-      
-      // Update current game ID if needed
-      currentGameId = data.gameId;
-      
-      // Prevent rapid timer updates
+
+    // In your client-side code, replace the current timer_sync handler with this:
+socket.on("timer_sync", (data) => {
+  // Ignore updates from old game sessions
+  if (currentGameId && data.gameId !== currentGameId) {
+    console.log("Ignoring timer update from old game session");
+    return;
+  }
+  
+  // Update current game ID if needed
+  currentGameId = data.gameId;
+  
+  const timerElement = document.getElementById("timer");
+  if (timerElement) {
+    // Force immediate update if it's a round reset
+    if (data.forceReset) {
+      timerElement.innerText = "20";
+      lastTimerUpdate = 0;  // Reset the throttle
+    } else {
+      // Normal timer update with throttling
       const now = Date.now();
-      if (now - lastTimerUpdate < 900) { // Allow for some network delay
+      if (now - lastTimerUpdate < 900) {
         return;
       }
       lastTimerUpdate = now;
-      
-      const timerElement = document.getElementById("timer");
-      if (timerElement) {
-        timerElement.innerText = Math.max(0, data.timeRemaining);
-        
-        if (data.timeRemaining <= 10) {
-          timerElement.classList.add("red");
-        } else {
-          timerElement.classList.remove("red");
-        }
-      }
-    });
+      timerElement.innerText = Math.max(0, data.timeRemaining);
+    }
+    
+    // Add this check for game over state
+    if (isGameOver || data.timeRemaining <= 10) {
+      timerElement.classList.add("red");
+    } else {
+      timerElement.classList.remove("red");
+    }
+  }
+});
+
 
     // Handle game cleanup event
     socket.on("game_cleanup", (data) => {
@@ -587,8 +576,13 @@
 
     // Handle game_over event
     socket.on("game_over", (data) => {
-      handleClientGameOver(data.endMessage);
-    });
+  const timerElement = document.getElementById("timer");
+  if (timerElement) {
+    timerElement.innerText = "0";
+    timerElement.classList.remove("red");
+  }
+  handleClientGameOver(data.endMessage);
+});
 
     // Handle waiting message
     socket.on("waiting_message", (message) => {
@@ -603,74 +597,66 @@
     });
 
     // Handle round_result event
-    socket.on("round_result", (data) => {
-      // Don't process if game is over
-      if (isGameOver) return;
+socket.on("round_result", (data) => {
+  // Don't process if game is over
+  if (isGameOver) return;
+  
+  // Check if this is a triple double timeout (TDT) round
+  const isTDTRound = data.logEntry && data.logEntry.includes("Third straight double timeout");
+  
+  // If not a TDT or game-ending round, increment the round counter
+  if (!isTDTRound) {
+    roundNumber++;
+    currentWager = 0; // Reset wager to 0 for the new round
+    updateWagerDisplay();
+  }
+  
+  const playerUnits = data.units[playerId];
+  const opponentUnits = data.units[opponentId];
+
+  document.getElementById("player-units").innerText = playerUnits || "0";
+  document.getElementById("player-bar").style.width = `${(playerUnits / 400) * 100}%`;
+  document.getElementById("opponent-units").innerText = opponentUnits || "0";
+
+  updateColors(playerUnits);
+
+  minWager = 10;
+  maxWager = playerUnits;
+  document.getElementById("wager-limits").innerText =
+    `Minimum wager: ${minWager} units. Maximum wager: ${maxWager} units.`;
+
+  const placeWagerButton = document.getElementById("place-wager-button");
+  placeWagerButton.innerText = "Place Wager";
+  placeWagerButton.style.display = "block";
+  placeWagerButton.disabled = false;
+
+  document.getElementById("wager-confirmation").innerText = "";
+  
+  // Process log entries
+  if (data.logEntry) {
+    const gameLog = document.getElementById("game-log");
+    const existingEntries = gameLog.childNodes;
+    
+    // Check if this exact message isn't already the most recent entry
+    if (existingEntries.length === 0 || existingEntries[0].innerText !== data.logEntry) {
+      const logItem = document.createElement("p");
       
-      // Check if this is a triple double timeout (TDT) round
-      const isTDTRound = data.logEntry && data.logEntry.includes("Third straight double timeout");
-      
-      // If not a TDT or game-ending round, increment the round counter
-      if (!isTDTRound) {
-        roundNumber++;
-        currentWager = 0; // Reset wager to 0 for the new round
-        updateWagerDisplay();
+      // Check if the log entry contains a round number
+      if (data.logEntry.startsWith("Round")) {
+        const [roundPart, ...restParts] = data.logEntry.split(": ");
+        const roundSpan = document.createElement("span");
+        roundSpan.className = "round-number";
+        roundSpan.textContent = roundPart + ": ";
+        logItem.appendChild(roundSpan);
+        logItem.appendChild(document.createTextNode(restParts.join(": ")));
+      } else {
+        logItem.innerText = data.logEntry;
       }
       
-      const playerUnits = data.units[playerId];
-      const opponentUnits = data.units[opponentId];
-
-      document.getElementById("player-units").innerText = playerUnits || "0";
-      document.getElementById("player-bar").style.width = `${(playerUnits / 400) * 100}%`;
-      document.getElementById("opponent-units").innerText = opponentUnits || "0";
-
-      updateColors(playerUnits);
-
-      minWager = 10;
-      maxWager = playerUnits;
-      document.getElementById("wager-limits").innerText =
-        `Minimum wager: ${minWager} units. Maximum wager: ${maxWager} units.`;
-
-      const placeWagerButton = document.getElementById("place-wager-button");
-      placeWagerButton.innerText = "Place Wager";
-      placeWagerButton.style.display = "block";
-      placeWagerButton.disabled = false;
-
-      document.getElementById("wager-confirmation").innerText = "";
-      
-      // Process log entries
-      if (data.logEntry) {
-        const gameLog = document.getElementById("game-log");
-        const existingEntries = gameLog.childNodes;
-        
-        // Check if this exact message isn't already the most recent entry
-        if (existingEntries.length === 0 || existingEntries[0].innerText !== data.logEntry) {
-          const logItem = document.createElement("p");
-          
-          // Check if the log entry contains a round number
-          if (data.logEntry.startsWith("Round")) {
-            const [roundPart, ...restParts] = data.logEntry.split(": ");
-            const roundSpan = document.createElement("span");
-            roundSpan.className = "round-number";
-            roundSpan.textContent = roundPart + ": ";
-            logItem.appendChild(roundSpan);
-            logItem.appendChild(document.createTextNode(restParts.join(": ")));
-          } else {
-            logItem.innerText = data.logEntry;
-          }
-          
-          gameLog.prepend(logItem);
-          
-          // If this is a TDT round, handle the game over
-          if (isTDTRound) {
-            // Handle game over with a delay to ensure message appears after TDT message
-            setTimeout(() => {
-              handleClientGameOver(winMessage);
-            }, 100);
-          }
-        }
-      }
-    });
+      gameLog.prepend(logItem);
+    }
+  }
+});
 
     // Handle game_reset_complete event
     socket.on("game_reset_complete", (data) => {

@@ -352,96 +352,117 @@ if (p1.units < 20 || p2.units < 20) {
 }
 
 function handleGameOver(winnerId) {
-const p1Id = playerSlots[0];
-const p2Id = playerSlots[1];
+  const p1Id = playerSlots[0];
+  const p2Id = playerSlots[1];
 
-clearInterval(timerInterval);
-clearTimeout(gameInactivityTimeout);
-timerState.isRunning = false;
+  clearInterval(timerInterval);
+  clearTimeout(gameInactivityTimeout);
+  timerState.isRunning = false;
+  
+  let endMessage = "";
+  if (winnerId === p1Id) {
+    io.to(p1Id).emit("game_over", { endMessage: "Congratulations, you won!" });
+    io.to(p2Id).emit("game_over", { endMessage: "Game over, you lost." });
+  } else if (winnerId === p2Id) {
+    io.to(p2Id).emit("game_over", { endMessage: "Congratulations, you won!" });
+    io.to(p1Id).emit("game_over", { endMessage: "Game over, you lost." });
+  } else {
+    io.emit("game_over", { endMessage: "Game over, it's a draw!" });
+  }
 
-let endMessage = "";
-if (winnerId === p1Id) {
-  io.to(p1Id).emit("game_over", { endMessage: "Congratulations, you won!" });
-  io.to(p2Id).emit("game_over", { endMessage: "Game over, you lost." });
-} else if (winnerId === p2Id) {
-  io.to(p2Id).emit("game_over", { endMessage: "Congratulations, you won!" });
-  io.to(p1Id).emit("game_over", { endMessage: "Game over, you lost." });
-} else {
-  io.emit("game_over", { endMessage: "Game over, it's a draw!" });
-}
+  io.emit("disable_wager_input");
+  io.emit("timer_sync", { 
+    timeRemaining: 0, 
+    gameId: currentGameId,
+    isGameOver: true,
+    forceRed: true  // Add this flag
+  });
+  isGameOver = true;
 
-io.emit("disable_wager_input");
-io.emit("timer_sync", { timeRemaining: 0, gameId: currentGameId });
-isGameOver = true;
-
-gameInactivityTimeout = setTimeout(() => {
-  cleanupGame();
-}, INACTIVITY_TIMEOUT);
+  gameInactivityTimeout = setTimeout(() => {
+    cleanupGame();
+  }, INACTIVITY_TIMEOUT);
 }
 
 function calculateRoundWinner(player1Id, player2Id) {
-const p1 = players[player1Id];
-const p2 = players[player2Id];
-roundNumber++;
+  const p1 = players[player1Id];
+  const p2 = players[player2Id];
+  roundNumber++;
 
-let logEntry = `Round ${roundNumber}: ${p1.name} wagered ${p1.wager}, ${p2.name} wagered ${p2.wager}. `;
+  let logEntry = `Round ${roundNumber}: ${p1.name} wagered ${p1.wager}, ${p2.name} wagered ${p2.wager}. `;
 
-if (p1.wager === p2.wager) {
-  logEntry += `It's a draw!`;
-  io.emit("round_result", {
-    units: { [player1Id]: p1.units, [player2Id]: p2.units },
-    logEntry,
-    isDraw: true,
-    roundNumber: roundNumber
-  });
-  p1.wager = null;
-  p2.wager = null;
-  consecutiveDoubleTimeouts = 0;
-  startTimer();
-  return;
-}
+  if (p1.wager === p2.wager) {
+    logEntry += `It's a draw!`;
+    io.emit("round_result", {
+      units: { [player1Id]: p1.units, [player2Id]: p2.units },
+      logEntry,
+      isDraw: true,
+      roundNumber: roundNumber
+    });
+    p1.wager = null;
+    p2.wager = null;
+    consecutiveDoubleTimeouts = 0;
+    
+    // Reset timer after processing wagers
+    clearInterval(timerInterval);
+    timerState.timeRemaining = 20;
+    io.emit("timer_sync", { 
+      timeRemaining: 20, 
+      gameId: currentGameId,
+      forceReset: true
+    });
+    startTimer();
+    return;
+  }
 
-let winner;
-let logNote = "";
+  let winner;
+  let logNote = "";
 
-if (p1.wager > p2.wager * 4) {
-  winner = p2;
-  logNote = "due to the '400% rule'";
-  p2.units += p1.wager;
-  p1.units -= p1.wager;
-} else if (p2.wager > p1.wager * 4) {
-  winner = p1;
-  logNote = "due to the '400% rule'";
-  p1.units += p2.wager;
-  p2.units -= p2.wager;
-} else {
-  winner = p1.wager > p2.wager ? p1 : p2;
-  if (winner === p1) {
+  if (p1.wager > p2.wager * 4) {
+    winner = p2;
+    logNote = "due to the '400% rule'";
+    p2.units += p1.wager;
+    p1.units -= p1.wager;
+  } else if (p2.wager > p1.wager * 4) {
+    winner = p1;
+    logNote = "due to the '400% rule'";
     p1.units += p2.wager;
     p2.units -= p2.wager;
   } else {
-    p2.units += p1.wager;
-    p1.units -= p1.wager;
+    winner = p1.wager > p2.wager ? p1 : p2;
+    if (winner === p1) {
+      p1.units += p2.wager;
+      p2.units -= p2.wager;
+    } else {
+      p2.units += p1.wager;
+      p1.units -= p1.wager;
+    }
+  }
+
+  logEntry += `${winner.name} wins ${logNote ? logNote : ""}!`;
+  io.emit("round_result", {
+    units: { [player1Id]: p1.units, [player2Id]: p2.units },
+    logEntry,
+    isDraw: false,
+    roundNumber: roundNumber
+  });
+
+  p1.wager = null;
+  p2.wager = null;
+  consecutiveDoubleTimeouts = 0;
+
+  if (p1.units < 20 || p2.units < 20) {
+    const winnerId = p1.units >= 20 ? player1Id : player2Id;
+    handleGameOver(winnerId);
+  } else {
+    // Reset timer after processing wagers
+    clearInterval(timerInterval);
+    timerState.timeRemaining = 20;
+    io.emit("timer_sync", { 
+      timeRemaining: 20, 
+      gameId: currentGameId,
+      forceReset: true
+    });
+    startTimer();
   }
 }
-
-logEntry += `${winner.name} wins ${logNote ? logNote : ""}!`;
-io.emit("round_result", {
-  units: { [player1Id]: p1.units, [player2Id]: p2.units },
-  logEntry,
-  isDraw: false,
-  roundNumber: roundNumber
-});
-
-p1.wager = null;
-p2.wager = null;
-consecutiveDoubleTimeouts = 0;
-
-if (p1.units < 20 || p2.units < 20) {
-  const winnerId = p1.units >= 20 ? player1Id : player2Id;
-  handleGameOver(winnerId);
-} else {
-  startTimer();
-}
-}
-
