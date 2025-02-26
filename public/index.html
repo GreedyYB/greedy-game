@@ -24,78 +24,36 @@
       text-shadow: 2px 2px 0 #fff, -2px -2px 0 #fff, 2px -2px 0 #fff, -2px 2px 0 #fff;
     }
 
-    #player-name {
-  font-weight: 900;
-  font-size: 1.5em;
-  font-family: 'Roboto Black', sans-serif;
-  margin: 10px 0;
-  text-shadow: 1px 1px 0 #fff, -1px -1px 0 #fff, 1px -1px 0 #fff, -1px 1px 0 #fff;
-} /* Remove the extra closing brace after this */
-
-.player-labels-container {
-  display: flex;
-  justify-content: space-between;
-  width: 100%;
-  max-width: 800px;
-  margin: 0 auto;
-  position: relative;
-}
-
-.you-label {
-  position: absolute;
-  left: 50px; /* Adjust based on your status-label width */
-  transform: translateX(-50%);
-}
-
-.enemy-label {
-  position: absolute;
-  right: 50px; /* Adjust based on your opponent-units position */
-  transform: translateX(50%);
-}
+    .status-container {
+      display: flex;
+      align-items: flex-start;
+      margin-bottom: 60px; /* Increased to make room for labels */
+      justify-content: center;
     }
 
-    /* Replace your current color classes with these */
-.player-label.you-color {
-  color: green !important;
-}
+    .status-column {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      position: relative;
+    }
 
-.player-label.enemy-color {
-  color: red !important;
-}
+    .player-label {
+      font-weight: bold;
+      font-family: 'Roboto', sans-serif;
+      text-align: center;
+      font-size: 1.8em;
+      position: absolute;
+      top: 40px;
+    }
 
-    .status-container {
-  display: flex;
-  align-items: flex-start; /* Keep scores at the top aligned */
-  margin-bottom: 20px;
-  justify-content: center;
-}
+    .player-label.you-color {
+      color: green !important;
+    }
 
-    /* Add this new rule */
-.status-column {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  position: relative; /* Add this */
-}
-
-/* And modify this rule for more precise control */
-.status-column:last-child .player-label {
-  margin-top: 8px;
-  position: absolute; /* Change from relative to absolute */
-  top: 35px; /* Explicit positioning - adjust this value as needed */
-  left: 50%;
-  transform: translateX(-50%);
-}
-
-/* Also add this rule for the first column */
-.status-column:first-child .player-label {
-  margin-top: 8px;
-  position: absolute;
-  top: 35px; /* Same value as the other label */
-  left: 50%;
-  transform: translateX(-50%);
-}
-
+    .player-label.enemy-color {
+      color: red !important;
+    }
 
     .status-label {
       width: 50px;
@@ -131,20 +89,19 @@
     }
 
     .enemy-units {
-  margin-left: 10px;
-  font-weight: bold;
-  font-family: 'Roboto', sans-serif;
-  color: black;
-}
+      margin-left: 10px;
+      font-weight: bold;
+      font-family: 'Roboto', sans-serif;
+      color: black;
+      font-size: 1.5em;
+    }
 
-  
     @keyframes messageWaitingPulse {
       0% { opacity: 1; }
       50% { opacity: 0.5; }
       100% { opacity: 1; }
     }
 
-    
     #play-again-button {
       padding: 15px 30px;
       font-size: 1.2em;
@@ -162,23 +119,89 @@
       background-color: rgb(11, 42, 240);
     }
 
+    /* Game Log Styling */
     #game-log {
-      max-height: 200px;
+      max-height: 250px;
       overflow-y: auto;
       border: 1px solid #ccc;
-      padding: 10px;
+      padding: 15px;
       margin-top: 20px;
+      display: flex;
+      flex-direction: column;
+      background-color: #f5f5f5;
+    }
+
+    .log-entry {
+      max-width: 80%;
+      margin: 2px 0; /* Reduced from 5px to 2px */
+      padding: 8px 12px; /* Reduced from 10px 15px */
+      border-radius: 12px;
+      position: relative;
+      font-family: 'Roboto', sans-serif;
+      clear: both;
+    }
+
+    .log-entry.system {
+      background-color: #f0f0f0;
+      border: 1px solid #ddd;
+      text-align: center;
+      margin: 4px auto; /* Reduced from 10px auto */
+      max-width: 90%;
+    }
+
+    .log-entry.you {
+      background-color: #e1f5e1;
+      border: 1px solid #c1e1c1;
+      float: left;
+      border-bottom-left-radius: 0;
       text-align: left;
     }
 
-    #game-log p {
-      margin: 5px 0;
-      font-family: 'Roboto', sans-serif;
+    .log-entry.enemy {
+      background-color: #f5e1e1;
+      border: 1px solid #e1c1c1;
+      float: right;
+      border-bottom-right-radius: 0;
+      text-align: right;
     }
 
-    #game-log p .round-number {
+    .log-entry.tie {
+      background-color: #fff3cd;
+      border: 1px solid #ffeeba;
+      text-align: center;
+      margin: 4px auto;
+      max-width: 90%;
+    }
+
+    .log-entry.timeout {
+      background-color: #e2e3e5;
+      border: 1px solid #d6d8db;
+      text-align: center;
+      margin: 4px auto;
+      max-width: 90%;
+    }
+
+    .log-entry .round-number {
       color: blue;
       font-weight: bold;
+    }
+
+    /* Clear float to prevent layout issues */
+    .log-entry.clearfix {
+      clear: both;
+      float: none;
+      width: 100%;
+      height: 1px;
+      margin: 1px 0; /* Reduced from 5px to 1px */
+      padding: 0;
+      border: none;
+      background: transparent;
+    }
+
+    /* Game Log Heading */
+    #game-log-heading {
+      text-align: left;
+      margin-top: 20px;
     }
 
     #wager-limits {
@@ -211,30 +234,11 @@
       100% { transform: scale(1); }
     }
 
-    .player-label {
-  font-weight: bold;
-  font-family: 'Roboto', sans-serif;
-  margin-top: 8px;
-  text-align: center;
-  font-size: 1.8em;
-}
-
-.status-column:last-child .player-label {
-  margin-top: 8px;
-  position: relative;
-  top: 0;
-}
-
     #round-and-wager {
       font-size: 1.5em;
       font-weight: bold;
       margin: 10px 0;
       font-family: 'Roboto', sans-serif;
-    }
-
-    #game-log-heading {
-      text-align: left;
-      margin-top: 20px;
     }
 
     /* Keypad Styles */
@@ -291,10 +295,6 @@
         font-size: 2em;
       }
 
-      #player-name {
-        font-size: 1.2em;
-      }
-
       .status-label {
         font-size: 1.2em;
       }
@@ -347,9 +347,6 @@
     </div>
   </div>
 
-  <!-- Display player name -->
-  <h3 id="player-name">Connecting...</h3>
-
   <!-- Combined Round and Wager display -->
   <div id="round-and-wager">Round 1 Wager: 0</div>
 
@@ -385,10 +382,8 @@
   <div id="wager-confirmation"></div>
 
   <!-- Timer display -->
-  <div id="timer">60</div>
+  <div id="timer">20</div>
 
-  <!-- Game Over Message -->
- 
   <!-- Game Log -->
   <h3 id="game-log-heading">Game Log:</h3>
   <div id="game-log"></div>
@@ -414,13 +409,70 @@
     let lastTimerUpdate = Date.now();
     let heartbeatInterval = null;
     let lastServerTimestamp = null;
+    let lastLogEntryRound = null;
 
     socket.on('connect', () => {
       startHeartbeat();
     });
 
-    socket.on('connect_error', (error) => {
+    socket.on('connect_error', () => {
+      // Error handling if needed
     });
+
+    // Function to add an entry to the game log with appropriate styling
+    function addToGameLog(message, type = 'system') {
+      const gameLog = document.getElementById("game-log");
+      
+      // Check if this message already exists in the log (to prevent duplicates)
+      const existingEntries = gameLog.querySelectorAll('.log-entry:not(.clearfix)');
+      for (let i = 0; i < existingEntries.length; i++) {
+        if (existingEntries[i].textContent === message || 
+            (message.includes("Third straight double timeout") && 
+             existingEntries[i].textContent.includes("Third straight double timeout"))) {
+          return; // Skip adding this message as it's already in the log
+        }
+      }
+      
+      // Determine if this is a tie message
+      if (message.includes("It's a draw!")) {
+        type = 'tie';
+      }
+      
+      // Determine if this is a double timeout message
+      if (message.includes("Double timeout!") || message.includes("double timeouts in a row") || 
+          message.includes("Third straight double timeout")) {
+        type = 'timeout';
+      }
+      
+      const logItem = document.createElement("div");
+      logItem.className = `log-entry ${type}`;
+      
+      // Check if the log entry contains a round number
+      if (message.startsWith("Round")) {
+        const [roundPart, ...restParts] = message.split(": ");
+        const roundSpan = document.createElement("span");
+        roundSpan.className = "round-number";
+        roundSpan.textContent = roundPart + ": ";
+        logItem.appendChild(roundSpan);
+        logItem.appendChild(document.createTextNode(restParts.join(": ")));
+      } else {
+        logItem.innerText = message;
+      }
+      
+      // Insert at the beginning of the game log (newest at top)
+      // First add a clearfix to maintain layout
+      const clearfix = document.createElement("div");
+      clearfix.className = "log-entry clearfix";
+      
+      // Insert at the beginning instead of prepending
+      if (gameLog.firstChild) {
+        gameLog.insertBefore(clearfix, gameLog.firstChild);
+        gameLog.insertBefore(logItem, gameLog.firstChild);
+      } else {
+        gameLog.appendChild(logItem);
+        gameLog.appendChild(clearfix);
+      }
+    }
 
     // Function to interpolate between two RGB colors
     function interpolateColor(color1, color2, factor) {
@@ -513,89 +565,80 @@
 
     // Function to handle game over state
     function handleClientGameOver(message) {
-  isGameOver = true;
+      isGameOver = true;
 
-  // Update the round-and-wager display to show win/lose message
-  document.getElementById("round-and-wager").innerText = message;
-  if (message.includes("won")) {
-    document.getElementById("round-and-wager").style.color = "green";
-  } else if (message.includes("lost")) {
-    document.getElementById("round-and-wager").style.color = "red";
-  }
-
-  // Ensure timer shows 0 and is red
-  const timerElement = document.getElementById("timer");
-  timerElement.innerText = "0";
-  timerElement.classList.add("red");
-
-  // Hide place-wager button and show play-again button in its place
-  document.getElementById("place-wager-button").style.display = "none";
-  document.getElementById("play-again-button").style.display = "block";
-
-  document.getElementById("keypad").style.display = "none";
-  document.getElementById("wager-limits").style.display = "none";
-  document.getElementById("wager-confirmation").style.display = "none";
-
-  // Add game over message to log with a delay
-  setTimeout(() => {
-    const gameLog = document.getElementById("game-log");
-    const gameOverMessage = `Game Over! ${message}`;
-    
-    // Check if this exact message is already the most recent entry
-    const existingEntries = gameLog.childNodes;
-    if (existingEntries.length === 0 || existingEntries[0].innerText !== gameOverMessage) {
-      const logItem = document.createElement("p");
-      logItem.innerText = gameOverMessage;
-      
-      // Add color styling based on win/lose
+      // Update the round-and-wager display to show win/lose message
+      document.getElementById("round-and-wager").innerText = message;
       if (message.includes("won")) {
-        logItem.style.color = "green";
+        document.getElementById("round-and-wager").style.color = "green";
       } else if (message.includes("lost")) {
-        logItem.style.color = "red";
+        document.getElementById("round-and-wager").style.color = "red";
       }
-      
-      gameLog.prepend(logItem);
+
+      // Ensure timer shows 0 and is red
+      const timerElement = document.getElementById("timer");
+      timerElement.innerText = "0";
+      timerElement.classList.add("red");
+
+      // Hide place-wager button and show play-again button in its place
+      document.getElementById("place-wager-button").style.display = "none";
+      document.getElementById("play-again-button").style.display = "block";
+
+      document.getElementById("keypad").style.display = "none";
+      document.getElementById("wager-limits").style.display = "none";
+      document.getElementById("wager-confirmation").style.display = "none";
+
+      // Add game over message to log with a delay
+      setTimeout(() => {
+        const gameOverMessage = `Game Over! ${message}`;
+        
+        // Determine message type
+        let messageType = 'system';
+        if (message.includes("won")) {
+          messageType = 'you';
+        } else if (message.includes("lost")) {
+          messageType = 'enemy';
+        }
+        
+        // Add to game log with appropriate styling
+        addToGameLog(gameOverMessage, messageType);
+      }, 300);
     }
-  }, 300);
-}
 
-
-    // In your client-side code, replace the current timer_sync handler with this:
-socket.on("timer_sync", (data) => {
-  // Ignore updates from old game sessions
-  if (currentGameId && data.gameId !== currentGameId) {
-    console.log("Ignoring timer update from old game session");
-    return;
-  }
-  
-  // Update current game ID if needed
-  currentGameId = data.gameId;
-  
-  const timerElement = document.getElementById("timer");
-  if (timerElement) {
-    // Force immediate update if it's a round reset
-    if (data.forceReset) {
-      timerElement.innerText = "60";
-      lastTimerUpdate = 0;  // Reset the throttle
-    } else {
-      // Normal timer update with throttling
-      const now = Date.now();
-      if (now - lastTimerUpdate < 900) {
+    // Timer sync handler
+    socket.on("timer_sync", (data) => {
+      // Ignore updates from old game sessions
+      if (currentGameId && data.gameId !== currentGameId) {
         return;
       }
-      lastTimerUpdate = now;
-      timerElement.innerText = Math.max(0, data.timeRemaining);
-    }
-    
-    // Add this check for game over state
-    if (isGameOver || data.timeRemaining <= 10) {
-      timerElement.classList.add("red");
-    } else {
-      timerElement.classList.remove("red");
-    }
-  }
-});
-
+      
+      // Update current game ID if needed
+      currentGameId = data.gameId;
+      
+      const timerElement = document.getElementById("timer");
+      if (timerElement) {
+        // Force immediate update if it's a round reset
+        if (data.forceReset) {
+          timerElement.innerText = "20";
+          lastTimerUpdate = 0;  // Reset the throttle
+        } else {
+          // Normal timer update with throttling
+          const now = Date.now();
+          if (now - lastTimerUpdate < 900) {
+            return;
+          }
+          lastTimerUpdate = now;
+          timerElement.innerText = Math.max(0, data.timeRemaining);
+        }
+        
+        // Add this check for game over state
+        if (isGameOver || data.timeRemaining <= 10) {
+          timerElement.classList.add("red");
+        } else {
+          timerElement.classList.remove("red");
+        }
+      }
+    });
 
     // Handle game cleanup event
     socket.on("game_cleanup", (data) => {
@@ -619,11 +662,14 @@ socket.on("timer_sync", (data) => {
       // Show cleanup message
       document.getElementById("round-and-wager").innerText = "Game inactive. Click 'Play Again' to start a new game.";
       document.getElementById("play-again-button").style.display = "block";
+      
+      // Add system message to game log
+      addToGameLog("Game cleaned up due to inactivity", "system");
     });
 
     // Handle assign_name event
     socket.on("assign_name", (data) => {
-      document.getElementById("player-name").innerText = `You are ${data.name}`;
+      // Removed player name display - no longer needed
       playerId = data.id;
     });
 
@@ -632,6 +678,9 @@ socket.on("timer_sync", (data) => {
       const opponentKey = Object.keys(data.players).find(key => key !== playerId);
       opponentId = opponentKey;
       document.getElementById("place-wager-button").disabled = false;
+      
+      // Add system message to game log
+      addToGameLog("Game ready! You can now place your wager.", "system");
     });
 
     // Handle update_round event
@@ -643,105 +692,127 @@ socket.on("timer_sync", (data) => {
 
     // Handle game_over event
     socket.on("game_over", (data) => {
-  const timerElement = document.getElementById("timer");
-  if (timerElement) {
-    timerElement.innerText = "0";
-    timerElement.classList.remove("red");
-  }
-  handleClientGameOver(data.endMessage);
-});
+      handleClientGameOver(data.endMessage);
+    });
 
     // Handle waiting message
     socket.on("waiting_message", (message) => {
       document.getElementById("round-and-wager").innerText = message;
       document.getElementById("round-and-wager").style.color = "red";
       document.getElementById("round-and-wager").style.animation = "messageWaitingPulse 1s infinite";
+      
+      // Add message to game log
+      addToGameLog(message, "system");
     });
 
-    // Handle opponent_locked_wager event
+    // Handle opponent_locked_wager event - no longer adding to game log
     socket.on("opponent_locked_wager", () => {
-      document.getElementById("wager-confirmation").innerText = "Opponent has locked in their wager.";
+      document.getElementById("wager-confirmation").innerText = "Enemy has locked in their wager.";
     });
 
     // Handle round_result event
-socket.on("round_result", (data) => {
-  // Don't process if game is over
-  if (isGameOver) return;
-  
-  // Check if this is a triple double timeout (TDT) round
-  const isTDTRound = data.logEntry && data.logEntry.includes("Third straight double timeout");
-  
-  // If not a TDT or game-ending round, increment the round counter
-  if (!isTDTRound) {
-    roundNumber++;
-    currentWager = 0; // Reset wager to 0 for the new round
-    updateWagerDisplay();
-  }
-  
-  const playerUnits = data.units[playerId];
-  const opponentUnits = data.units[opponentId];
-
-  document.getElementById("player-units").innerText = playerUnits || "0";
-  document.getElementById("player-bar").style.width = `${(playerUnits / 400) * 100}%`;
-  document.getElementById("enemy-units").innerText = opponentUnits || "0";
-
-  updateColors(playerUnits);
-
-  minWager = 10;
-  maxWager = playerUnits;
-  document.getElementById("wager-limits").innerText =
-    `Minimum wager: ${minWager} units. Maximum wager: ${maxWager} units.`;
-
-  const placeWagerButton = document.getElementById("place-wager-button");
-  placeWagerButton.innerText = "Place Wager";
-  placeWagerButton.style.display = "block";
-  placeWagerButton.disabled = false;
-
-  document.getElementById("wager-confirmation").innerText = "";
-  
-  // Process log entries
-  if (data.logEntry) {
-    const gameLog = document.getElementById("game-log");
-    const existingEntries = gameLog.childNodes;
-    
-    // Check if this exact message isn't already the most recent entry
-    if (existingEntries.length === 0 || existingEntries[0].innerText !== data.logEntry) {
-      const logItem = document.createElement("p");
+    socket.on("round_result", (data) => {
+      // Don't process if game is over
+      if (isGameOver) return;
       
-      // Check if the log entry contains a round number
-      if (data.logEntry.startsWith("Round")) {
-        const [roundPart, ...restParts] = data.logEntry.split(": ");
-        const roundSpan = document.createElement("span");
-        roundSpan.className = "round-number";
-        roundSpan.textContent = roundPart + ": ";
-        logItem.appendChild(roundSpan);
-        logItem.appendChild(document.createTextNode(restParts.join(": ")));
-      } else {
-        logItem.innerText = data.logEntry;
+      // Check if this is a triple double timeout (TDT) round
+      const isTDTRound = data.logEntry && data.logEntry.includes("Third straight double timeout");
+      
+      // If not a TDT or game-ending round, increment the round counter
+      if (!isTDTRound) {
+        roundNumber++;
+        currentWager = 0; // Reset wager to 0 for the new round
+        updateWagerDisplay();
       }
       
-      gameLog.prepend(logItem);
-    }
-  }
-});
+      const playerUnits = data.units[playerId];
+      const opponentUnits = data.units[opponentId];
+
+      document.getElementById("player-units").innerText = playerUnits || "0";
+      document.getElementById("player-bar").style.width = `${(playerUnits / 400) * 100}%`;
+      document.getElementById("enemy-units").innerText = opponentUnits || "0";
+
+      updateColors(playerUnits);
+
+      minWager = 10;
+      maxWager = playerUnits;
+      document.getElementById("wager-limits").innerText =
+        `Minimum wager: ${minWager} units. Maximum wager: ${maxWager} units.`;
+
+      const placeWagerButton = document.getElementById("place-wager-button");
+      placeWagerButton.innerText = "Place Wager";
+      placeWagerButton.style.display = "block";
+      placeWagerButton.disabled = false;
+
+      document.getElementById("wager-confirmation").innerText = "";
+      
+      // Process log entry
+      if (data.logEntry) {
+        // Determine message type based on content
+        let messageType = 'system';
+        if (data.logEntry.includes("You win")) {
+          messageType = 'you';
+        } else if (data.logEntry.includes("The enemy wins")) {
+          messageType = 'enemy';
+        } else if (data.logEntry.includes("It's a draw")) {
+          messageType = 'tie';
+        } else if (data.logEntry.includes("Double timeout") || data.logEntry.includes("double timeouts in a row") || data.logEntry.includes("Third straight double timeout")) {
+          messageType = 'timeout';
+        } else if (data.logEntry.includes("You wagered")) {
+          // It's about your actions but not necessarily a win
+          messageType = 'you';
+        }
+        
+        // Add to game log with appropriate styling
+        addToGameLog(data.logEntry, messageType);
+      }
+    });
+
+    // Handle update_game_log event
+    socket.on("update_game_log", (logEntry) => {
+      // Check if we should skip this message (for TDT)
+      if (logEntry.includes("Third straight double timeout")) {
+        // We'll handle this message in the round_result event to avoid duplicates
+        return;
+      }
+
+      // Determine message type based on content
+      let messageType = 'system';
+      if (logEntry.includes("You win")) {
+        messageType = 'you';
+      } else if (logEntry.includes("The enemy wins")) {
+        messageType = 'enemy';
+      } else if (logEntry.includes("It's a draw")) {
+        messageType = 'tie';
+      } else if (logEntry.includes("Double timeout") || logEntry.includes("double timeouts in a row")) {
+        messageType = 'timeout';
+      } else if (logEntry.includes("You wagered")) {
+        messageType = 'you';
+      } else if (logEntry.includes("The enemy wagered")) {
+        messageType = 'enemy';
+      }
+      
+      // Add to game log with appropriate styling
+      addToGameLog(logEntry, messageType);
+    });
 
     // Handle game_reset_complete event
     socket.on("game_reset_complete", (data) => {
       // Validate timestamp to prevent stale resets
       if (lastServerTimestamp && data.timestamp < lastServerTimestamp) {
-        console.log("Ignoring stale game reset");
         return;
       }
       
       lastServerTimestamp = data.timestamp;
       currentGameId = data.gameId;
       startHeartbeat();
+      lastLogEntryRound = null;
       
       document.getElementById("game-log").innerHTML = "";
       
       // Reset player units and colors
       const playerUnits = document.getElementById("player-units");
-const enemyUnits = document.getElementById("enemy-units");
+      const enemyUnits = document.getElementById("enemy-units");
       
       playerUnits.innerText = "200";
       enemyUnits.innerText = "200";
@@ -776,6 +847,9 @@ const enemyUnits = document.getElementById("enemy-units");
 
       document.getElementById("wager-limits").style.display = "block";
       document.getElementById("wager-confirmation").style.display = "block";
+      
+      // Add system message to game log
+      addToGameLog("Game reset complete. Ready for a new match!", "system");
     });
 
     // Handle disable_wager_input event
@@ -792,7 +866,8 @@ const enemyUnits = document.getElementById("enemy-units");
     // Function to reset the game
     function playAgain() {
       socket.emit("reset_game");
+      addToGameLog("Requesting game reset...", "system");
     }
   </script>
 </body>
-</html>
+</html
