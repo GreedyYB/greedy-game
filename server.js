@@ -37,7 +37,7 @@ const INACTIVITY_TIMEOUT = 2 * 60 * 1000;
 let currentGameId = null;
 let timerState = {
   isRunning: false,
-  timeRemaining: 20, // Changed to 20 seconds
+  timeRemaining: 60, // Changed to 60 seconds
   gameId: null
 };
 
@@ -195,7 +195,7 @@ function startTimer() {
   
   timerState = {
     isRunning: true,
-    timeRemaining: 20, // Changed to 20 seconds
+    timeRemaining: 60, // Changed to 60 seconds
     gameId: currentGameId
   };
   
@@ -241,15 +241,15 @@ function handleTimeout() {
     winningPlayer = p2;
     lostUnits = p2.wager;
     consecutiveDoubleTimeouts = 0;
-    logEntryP1 = `Round ${roundNumber}: You timed out and lost ${lostUnits} units.`;
-    logEntryP2 = `Round ${roundNumber}: The enemy timed out. You won ${lostUnits} units.`;
+    logEntryP1 = `Round ${roundNumber}: You timed out. Lost ${lostUnits} units.`;
+    logEntryP2 = `Round ${roundNumber}: Enemy timed out. You won ${lostUnits} units.`;
   } else if (p2.wager === null && p1.wager !== null) {
     timedOutPlayer = p2;
     winningPlayer = p1;
     lostUnits = p1.wager;
     consecutiveDoubleTimeouts = 0;
-    logEntryP1 = `Round ${roundNumber}: The enemy timed out. You won ${lostUnits} units.`;
-    logEntryP2 = `Round ${roundNumber}: You timed out and lost ${lostUnits} units.`;
+    logEntryP1 = `Round ${roundNumber}: Enemy timed out. You won ${lostUnits} units.`;
+    logEntryP2 = `Round ${roundNumber}: You timed out. Lost ${lostUnits} units.`;
   } else if (p1.wager === null && p2.wager === null) {
     consecutiveDoubleTimeouts++;
     
@@ -340,13 +340,25 @@ function handleTimeout() {
         units: { [p1Id]: p1.units, [p2Id]: p2.units },
         logEntry: logEntryP1,
         isDoubleTimeout: true,
-        roundNumber: roundNumber
+        roundNumber: roundNumber,
+        specialEvent: {
+            p1Wager: 0,
+            p2Wager: 0,
+            winner: null,
+            logNote: "double_timeout"
+        }
     });
     io.to(p2Id).emit("round_result", {
         units: { [p1Id]: p1.units, [p2Id]: p2.units },
         logEntry: logEntryP2,
         isDoubleTimeout: true,
-        roundNumber: roundNumber
+        roundNumber: roundNumber,
+        specialEvent: {
+            p1Wager: 0,
+            p2Wager: 0,
+            winner: null,
+            logNote: "double_timeout"
+        }
     });
     
     p1.wager = null;
@@ -362,27 +374,53 @@ function handleTimeout() {
   io.to(p2Id).emit("update_game_log", logEntryP2);
 
   if (timedOutPlayer && winningPlayer) {
-    timedOutPlayer.units -= lostUnits;
-    winningPlayer.units += lostUnits;
+    // Calculate how many units the timedOutPlayer can actually lose
+    const maxPossibleLoss = timedOutPlayer.units;
+    const actualTransfer = Math.min(lostUnits, maxPossibleLoss);
+    
+    timedOutPlayer.units -= actualTransfer;
+    winningPlayer.units += actualTransfer;
+    
+    // Add a note if the transfer was limited
+    let transferNote = "";
+    if (actualTransfer < lostUnits) {
+      transferNote = ` (limited by available units)`;
+      logEntryP1 += transferNote;
+      logEntryP2 += transferNote;
+    }
+    
     io.to(p1Id).emit("round_result", {
       units: { [p1Id]: p1.units, [p2Id]: p2.units },
       logEntry: logEntryP1,
       isDraw: false,
-      roundNumber: roundNumber
+      roundNumber: roundNumber,
+      specialEvent: {
+        p1Wager: p1.wager !== null ? p1.wager : 0,
+        p2Wager: p2.wager !== null ? p2.wager : 0,
+        winner: winningPlayer === p1 ? p1Id : p2Id,
+        logNote: "timeout"
+      }
     });
     io.to(p2Id).emit("round_result", {
       units: { [p1Id]: p1.units, [p2Id]: p2.units },
       logEntry: logEntryP2,
       isDraw: false,
-      roundNumber: roundNumber
+      roundNumber: roundNumber,
+      specialEvent: {
+        p1Wager: p1.wager !== null ? p1.wager : 0,
+        p2Wager: p2.wager !== null ? p2.wager : 0,
+        winner: winningPlayer === p1 ? p1Id : p2Id,
+        logNote: "timeout"
+      }
     });
   }
 
   p1.wager = null;
   p2.wager = null;
 
-  if (p1.units < 20 || p2.units < 20) {
-    const winnerId = p1.units >= 20 ? p1Id : p2Id;
+  // End the game if either player has 0 units or less than 20 units
+  if (p1.units <= 0 || p2.units <= 0 || p1.units < 20 || p2.units < 20) {
+    const winnerId = (p1.units <= 0) ? p2Id : (p2.units <= 0) ? p1Id : (p1.units < 20) ? p2Id : p1Id;
     handleGameOver(winnerId);
   } else if (!isGameOver) {
     startTimer();
@@ -425,23 +463,44 @@ function calculateRoundWinner(player1Id, player2Id) {
   const p2 = players[player2Id];
   roundNumber++;
 
-  let p1LogEntry = `Round ${roundNumber}: You wagered ${p1.wager}, the enemy wagered ${p2.wager}. `;
-  let p2LogEntry = `Round ${roundNumber}: You wagered ${p2.wager}, the enemy wagered ${p1.wager}. `;
+  // Log initial units for debugging
+  console.log(`Before calculation - P1: ${p1.units}, P2: ${p2.units}, Total: ${p1.units + p2.units}`);
+  console.log(`Wagers - P1: ${p1.wager}, P2: ${p2.wager}`);
+
+  // Changed message format to be shorter
+  let p1LogEntry = `Round ${roundNumber}: Your wager: ${p1.wager}, Enemy: ${p2.wager}. `;
+  let p2LogEntry = `Round ${roundNumber}: Your wager: ${p2.wager}, Enemy: ${p1.wager}. `;
 
   if (p1.wager === p2.wager) {
     p1LogEntry += `It's a draw!`;
     p2LogEntry += `It's a draw!`;
+    
+    // No change in units for a draw
+    console.log(`Draw - P1: ${p1.units}, P2: ${p2.units}, Total: ${p1.units + p2.units}`);
+    
     io.to(player1Id).emit("round_result", {
       units: { [player1Id]: p1.units, [player2Id]: p2.units },
       logEntry: p1LogEntry,
       isDraw: true,
-      roundNumber: roundNumber
+      roundNumber: roundNumber,
+      specialEvent: {
+        p1Wager: p1.wager,
+        p2Wager: p2.wager,
+        winner: null,
+        logNote: null
+      }
     });
     io.to(player2Id).emit("round_result", {
       units: { [player1Id]: p1.units, [player2Id]: p2.units },
       logEntry: p2LogEntry,
       isDraw: true,
-      roundNumber: roundNumber
+      roundNumber: roundNumber,
+      specialEvent: {
+        p1Wager: p1.wager,
+        p2Wager: p2.wager,
+        winner: null,
+        logNote: null
+      }
     });
     p1.wager = null;
     p2.wager = null;
@@ -452,27 +511,77 @@ function calculateRoundWinner(player1Id, player2Id) {
 
   let winner;
   let logNote = "";
+  let transferAmount = 0;
+  let limitedTransfer = false;
 
+  // 400% rule check
   if (p1.wager > p2.wager * 4) {
     winner = p2;
     logNote = "due to the '400% rule'";
-    p2.units += p1.wager;
-    p1.units -= p1.wager;
+    transferAmount = p1.wager; // Amount p1 loses and p2 gains
+    
+    // Check if player has enough units
+    if (transferAmount > p1.units) {
+      transferAmount = p1.units;
+      limitedTransfer = true;
+    }
+    
+    p1.units -= transferAmount;
+    p2.units += transferAmount;
+    
+    console.log(`400% rule (P1 over) - Transfer: ${transferAmount}`);
   } else if (p2.wager > p1.wager * 4) {
     winner = p1;
     logNote = "due to the '400% rule'";
-    p1.units += p2.wager;
-    p2.units -= p2.wager;
+    transferAmount = p2.wager; // Amount p2 loses and p1 gains
+    
+    // Check if player has enough units
+    if (transferAmount > p2.units) {
+      transferAmount = p2.units;
+      limitedTransfer = true;
+    }
+    
+    p2.units -= transferAmount;
+    p1.units += transferAmount;
+    
+    console.log(`400% rule (P2 over) - Transfer: ${transferAmount}`);
   } else {
+    // Normal win case
     winner = p1.wager > p2.wager ? p1 : p2;
     if (winner === p1) {
-      p1.units += p2.wager;
-      p2.units -= p2.wager;
+      transferAmount = p2.wager;
+      
+      // Check if player has enough units
+      if (transferAmount > p2.units) {
+        transferAmount = p2.units;
+        limitedTransfer = true;
+      }
+      
+      p1.units += transferAmount;
+      p2.units -= transferAmount;
+      console.log(`P1 wins - Transfer: ${transferAmount}`);
     } else {
-      p2.units += p1.wager;
-      p1.units -= p1.wager;
+      transferAmount = p1.wager;
+      
+      // Check if player has enough units
+      if (transferAmount > p1.units) {
+        transferAmount = p1.units;
+        limitedTransfer = true;
+      }
+      
+      p2.units += transferAmount;
+      p1.units -= transferAmount;
+      console.log(`P2 wins - Transfer: ${transferAmount}`);
     }
   }
+
+  // Add transfer limit note if needed
+  if (limitedTransfer) {
+    logNote += " (limited by available units)";
+  }
+
+  // Log final units for debugging
+  console.log(`After calculation - P1: ${p1.units}, P2: ${p2.units}, Total: ${p1.units + p2.units}`);
 
   if (winner === p1) {
     p1LogEntry += `You win ${logNote ? logNote : ""}!`;
@@ -486,21 +595,34 @@ function calculateRoundWinner(player1Id, player2Id) {
     units: { [player1Id]: p1.units, [player2Id]: p2.units },
     logEntry: p1LogEntry,
     isDraw: false,
-    roundNumber: roundNumber
+    roundNumber: roundNumber,
+    specialEvent: {
+      p1Wager: p1.wager,
+      p2Wager: p2.wager,
+      winner: winner === p1 ? player1Id : player2Id,
+      logNote: logNote
+    }
   });
   io.to(player2Id).emit("round_result", {
     units: { [player1Id]: p1.units, [player2Id]: p2.units },
     logEntry: p2LogEntry,
     isDraw: false,
-    roundNumber: roundNumber
+    roundNumber: roundNumber,
+    specialEvent: {
+      p1Wager: p1.wager,
+      p2Wager: p2.wager,
+      winner: winner === p1 ? player1Id : player2Id,
+      logNote: logNote
+    }
   });
 
   p1.wager = null;
   p2.wager = null;
   consecutiveDoubleTimeouts = 0;
 
-  if (p1.units < 20 || p2.units < 20) {
-    const winnerId = p1.units >= 20 ? player1Id : player2Id;
+  // End game if a player has 0 units or less than 20
+  if (p1.units <= 0 || p2.units <= 0 || p1.units < 20 || p2.units < 20) {
+    const winnerId = (p1.units <= 0) ? player2Id : (p2.units <= 0) ? player1Id : (p1.units < 20) ? player2Id : player1Id;
     handleGameOver(winnerId);
   } else {
     startTimer();

@@ -55,6 +55,23 @@
       color: red !important;
     }
 
+    .player-emoji {
+      font-size: 2.5em;
+      margin-top: 45px;
+      position: relative;
+      transition: transform 0.5s ease;
+    }
+
+    .player-emoji.pulse {
+      animation: emoji-pulse 0.5s ease;
+    }
+
+    @keyframes emoji-pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.4); }
+      100% { transform: scale(1); }
+    }
+
     .status-label {
       width: 50px;
       text-align: right;
@@ -161,6 +178,8 @@
       background-color: #f5e1e1;
       border: 1px solid #e1c1c1;
       float: right;
+      margin-left: auto;
+      margin-right: 0;
       border-bottom-right-radius: 0;
       text-align: right;
     }
@@ -239,6 +258,69 @@
       font-weight: bold;
       margin: 10px 0;
       font-family: 'Roboto', sans-serif;
+    }
+
+    /* Event Message Popup */
+    .event-message {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background-color: rgba(0, 0, 0, 0.7);
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .event-message.visible {
+      opacity: 1;
+    }
+
+    .event-message.hidden {
+      display: none;
+    }
+
+    .message-content {
+      background-color: #fff;
+      border-radius: 10px;
+      padding: 20px;
+      max-width: 80%;
+      text-align: center;
+      box-shadow: 0 0 20px rgba(0, 0, 0, 0.5);
+      animation: bounceIn 0.5s;
+    }
+
+    @keyframes bounceIn {
+      0% { transform: scale(0.5); opacity: 0; }
+      50% { transform: scale(1.05); opacity: 0.8; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    #message-text {
+      font-size: 1.5em;
+      font-weight: bold;
+      margin: 10px 0 20px;
+      color: #333;
+      font-family: 'Roboto', sans-serif;
+    }
+
+    #dismiss-message {
+      background-color: #015c21;
+      color: white;
+      border: none;
+      padding: 10px 20px;
+      font-size: 1em;
+      border-radius: 5px;
+      cursor: pointer;
+      font-family: 'Roboto', sans-serif;
+    }
+
+    #dismiss-message:hover {
+      background-color: #013f15;
     }
 
     /* Keypad Styles */
@@ -335,6 +417,7 @@
     <div class="status-column">
       <div class="status-label" id="player-units">200</div>
       <div class="player-label you-color">YOU</div>
+      <div class="player-emoji" id="player-emoji">🙂</div>
     </div>
     
     <div class="status-bar">
@@ -344,11 +427,20 @@
     <div class="status-column">
       <div class="enemy-units" id="enemy-units">200</div>
       <div class="player-label enemy-color">ENEMY</div>
+      <div class="player-emoji" id="enemy-emoji">🙂</div>
     </div>
   </div>
 
   <!-- Combined Round and Wager display -->
   <div id="round-and-wager">Round 1 Wager: 0</div>
+
+  <!-- Event Message Popup -->
+  <div id="event-message" class="event-message hidden">
+    <div class="message-content">
+      <p id="message-text">Message goes here</p>
+      <button id="dismiss-message">OK</button>
+    </div>
+  </div>
 
   <!-- Button container to hold both buttons in the same position -->
   <div class="button-container">
@@ -382,7 +474,7 @@
   <div id="wager-confirmation"></div>
 
   <!-- Timer display -->
-  <div id="timer">20</div>
+  <div id="timer">60</div>
 
   <!-- Game Log -->
   <h3 id="game-log-heading">Game Log:</h3>
@@ -472,6 +564,185 @@
         gameLog.appendChild(logItem);
         gameLog.appendChild(clearfix);
       }
+    }
+
+    // Function to show special event messages
+    function showEventMessage(message) {
+      const messageElement = document.getElementById("event-message");
+      const messageText = document.getElementById("message-text");
+      
+      messageText.innerText = message;
+      messageElement.classList.remove("hidden");
+      setTimeout(() => {
+        messageElement.classList.add("visible");
+      }, 10);
+      
+      // Set up the dismiss button
+      document.getElementById("dismiss-message").onclick = function() {
+        messageElement.classList.remove("visible");
+        setTimeout(() => {
+          messageElement.classList.add("hidden");
+        }, 300);
+      };
+      
+      // Also dismiss when clicking anywhere on the overlay
+      messageElement.onclick = function(event) {
+        if (event.target === messageElement) {
+          messageElement.classList.remove("visible");
+          setTimeout(() => {
+            messageElement.classList.add("hidden");
+          }, 300);
+        }
+      };
+    }
+
+    // Function to check for special events
+    function checkForSpecialEvents(p1Wager, p2Wager, winner, logNote) {
+      // Get current unit values
+      const playerUnits = parseInt(document.getElementById("player-units").innerText);
+      const enemyUnits = parseInt(document.getElementById("enemy-units").innerText);
+      
+      // Check if the game is ending (units below 20 or at 0)
+      if (playerUnits < 20 || enemyUnits < 20 || playerUnits <= 0 || enemyUnits <= 0 || isGameOver) {
+        console.log("Game is ending or has ended - suppressing special messages");
+        return; // Skip all special messages if the game is ending
+      }
+      
+      // Close call message (won/lost by 1-2 units difference)
+      const wagerDifference = Math.abs(p1Wager - p2Wager);
+      
+      if (wagerDifference <= 2 && wagerDifference > 0) {
+        const closeCallMessages = [
+          `Whoa! Just ${wagerDifference} unit${wagerDifference === 1 ? '' : 's'} difference!`,
+          `Are you serious? ${wagerDifference} unit${wagerDifference === 1 ? '' : 's'}!?!`,
+          `Holy cow, ${wagerDifference === 1 ? 'only one' : 'just two'} unit${wagerDifference === 1 ? '' : 's'}!`,
+          `That was CLOSE! ${wagerDifference} unit${wagerDifference === 1 ? '' : 's'} between victory and defeat!`,
+          `Talk about a nail-biter! ${wagerDifference} unit${wagerDifference === 1 ? '' : 's'} difference!`
+        ];
+        
+        const randomIndex = Math.floor(Math.random() * closeCallMessages.length);
+        setTimeout(() => {
+          showEventMessage(closeCallMessages[randomIndex]);
+        }, 800);
+        return;
+      }
+      
+      // 400% rule message - different messages for winner and loser
+      if (logNote && logNote.includes("400% rule")) {
+        // Specific messages for the winner
+        const winnerMessages = [
+          "Nice Play!",
+          "That was a huge win!",
+          "Awesome win!",
+          "Wow! Great play!",
+          "You've got the enemy figured out now!",
+          "Slow and steady wins the race."
+        ];
+        
+        // Specific messages for the loser
+        const loserMessages = [
+          "The greedy get needy!",
+          "OUCH! That's going to leave mark.",
+          "A swing and a miss!",
+          "Oh well, you gave it a shot.",
+          "Why so much?",
+          "Are you sure you know what you're doing?"
+        ];
+        
+        // Choose the appropriate message list based on whether the current player is the winner
+        const messageList = (winner === playerId) ? winnerMessages : loserMessages;
+        
+        const randomIndex = Math.floor(Math.random() * messageList.length);
+        setTimeout(() => {
+          showEventMessage(messageList[randomIndex]);
+        }, 800);
+        return;
+      }
+      
+      // Perfect tie message
+      if (p1Wager === p2Wager && p1Wager > 0) {
+        const tieMessages = [
+          "Great minds think alike!",
+          "Jinx! You both thought the same thing!",
+          "What are the odds? Perfect match!",
+          "Are you two sharing notes?",
+          "Synchronized wagering! Olympic-level stuff!"
+        ];
+        
+        const randomIndex = Math.floor(Math.random() * tieMessages.length);
+        setTimeout(() => {
+          showEventMessage(tieMessages[randomIndex]);
+        }, 800);
+        return;
+      }
+      
+      // Massive win message (difference > 100 units)
+      if (wagerDifference > 100) {
+        const massiveWinMessages = [
+          "That's a massive win!",
+          "Talk about a landslide!",
+          "Absolutely crushing it!",
+          "That's gotta hurt!",
+          "Someone's having a very good (or very bad) day!"
+        ];
+        
+        const randomIndex = Math.floor(Math.random() * massiveWinMessages.length);
+        setTimeout(() => {
+          showEventMessage(massiveWinMessages[randomIndex]);
+        }, 800);
+        return;
+      }
+    }
+
+    // Function to update emojis based on units
+    function updateEmojis(playerUnits, enemyUnits) {
+      const playerEmoji = document.getElementById("player-emoji");
+      const enemyEmoji = document.getElementById("enemy-emoji");
+      
+      // Remove pulse class first
+      playerEmoji.classList.remove("pulse");
+      enemyEmoji.classList.remove("pulse");
+      
+      // Set player emoji based on units
+      const playerEmote = getEmojiForUnits(playerUnits);
+      const enemyEmote = getEmojiForUnits(enemyUnits);
+      
+      // Only animate if emoji is changing
+      if (playerEmoji.innerText !== playerEmote) {
+        playerEmoji.innerText = playerEmote;
+        playerEmoji.classList.add("pulse");
+      }
+      
+      if (enemyEmoji.innerText !== enemyEmote) {
+        enemyEmoji.innerText = enemyEmote;
+        enemyEmoji.classList.add("pulse");
+      }
+    }
+
+    function getEmojiForUnits(units) {
+      // Precise ranges for each emoji state
+      if (units <= 20) return "💀"; // Dead (0-20)
+      if (units <= 30) return "😱"; // Terrified (21-30)
+      if (units <= 40) return "😨"; // Fearful (31-40)
+      if (units <= 60) return "😰"; // Anxious (41-60)
+      if (units <= 80) return "😢"; // Crying (61-80)
+      if (units <= 100) return "😠"; // Angry (81-100)
+      if (units <= 120) return "😟"; // Worried (101-120)
+      if (units <= 140) return "😖"; // Confounded (121-140)
+      if (units <= 160) return "😔"; // Sad (141-160)
+      if (units <= 180) return "😒"; // Unamused (161-180)
+      if (units <= 199) return "😐"; // Neutral (181-199)
+      if (units <= 210) return "🙂"; // Slightly happy (200-210)
+      if (units <= 230) return "😊"; // Happy (211-230)
+      if (units <= 240) return "😁"; // Very happy (231-240)      
+      if (units <= 260) return "😄"; // Grinning (241-260)
+      if (units <= 280) return "😏"; // Smirking (261-280)
+      if (units <= 300) return "😎"; // Cool (281-300)
+      if (units <= 320) return "😏"; // Smirking (301-320)
+      if (units <= 340) return "😜"; // Winking (321-340)
+      if (units <= 360) return "🤣"; // Laughing (341-360)
+      if (units <= 380) return "🤑"; // Money face (361-380)
+      return "🥳"; // Party face (381+)
     }
 
     // Function to interpolate between two RGB colors
@@ -619,7 +890,7 @@
       if (timerElement) {
         // Force immediate update if it's a round reset
         if (data.forceReset) {
-          timerElement.innerText = "20";
+          timerElement.innerText = "60";
           lastTimerUpdate = 0;  // Reset the throttle
         } else {
           // Normal timer update with throttling
@@ -692,6 +963,17 @@
 
     // Handle game_over event
     socket.on("game_over", (data) => {
+      isGameOver = true;
+      
+      // Force dismiss any currently showing event messages
+      const messageElement = document.getElementById("event-message");
+      if (messageElement && !messageElement.classList.contains("hidden")) {
+        messageElement.classList.remove("visible");
+        setTimeout(() => {
+          messageElement.classList.add("hidden");
+        }, 100);
+      }
+      
       handleClientGameOver(data.endMessage);
     });
 
@@ -733,6 +1015,15 @@
       document.getElementById("enemy-units").innerText = opponentUnits || "0";
 
       updateColors(playerUnits);
+      
+      // Update emojis based on units
+      updateEmojis(playerUnits, opponentUnits);
+
+      // Set isGameOver flag if either player has less than 20 units or 0 units
+      if (playerUnits < 20 || opponentUnits < 20 || playerUnits <= 0 || opponentUnits <= 0) {
+        isGameOver = true;
+        console.log("Round result indicates game is ending - units below threshold");
+      }
 
       minWager = 10;
       maxWager = playerUnits;
@@ -750,21 +1041,27 @@
       if (data.logEntry) {
         // Determine message type based on content
         let messageType = 'system';
-        if (data.logEntry.includes("You win")) {
+        if (data.logEntry.includes("You win") || data.logEntry.includes("Enemy timed out. You won")) {
           messageType = 'you';
-        } else if (data.logEntry.includes("The enemy wins")) {
+        } else if (data.logEntry.includes("The enemy wins") || data.logEntry.includes("You timed out. Lost")) {
           messageType = 'enemy';
         } else if (data.logEntry.includes("It's a draw")) {
           messageType = 'tie';
         } else if (data.logEntry.includes("Double timeout") || data.logEntry.includes("double timeouts in a row") || data.logEntry.includes("Third straight double timeout")) {
           messageType = 'timeout';
-        } else if (data.logEntry.includes("You wagered")) {
+        } else if (data.logEntry.includes("Your wager")) {
           // It's about your actions but not necessarily a win
           messageType = 'you';
         }
         
         // Add to game log with appropriate styling
         addToGameLog(data.logEntry, messageType);
+      }
+      
+      // Only check for special events if game is NOT ending
+      if (!isGameOver && data.specialEvent) {
+        const { p1Wager, p2Wager, winner, logNote } = data.specialEvent;
+        checkForSpecialEvents(p1Wager, p2Wager, winner, logNote);
       }
     });
 
@@ -778,15 +1075,15 @@
 
       // Determine message type based on content
       let messageType = 'system';
-      if (logEntry.includes("You win")) {
+      if (logEntry.includes("You win") || logEntry.includes("Enemy timed out. You won")) {
         messageType = 'you';
-      } else if (logEntry.includes("The enemy wins")) {
+      } else if (logEntry.includes("The enemy wins") || logEntry.includes("You timed out. Lost")) {
         messageType = 'enemy';
       } else if (logEntry.includes("It's a draw")) {
         messageType = 'tie';
       } else if (logEntry.includes("Double timeout") || logEntry.includes("double timeouts in a row")) {
         messageType = 'timeout';
-      } else if (logEntry.includes("You wagered")) {
+      } else if (logEntry.includes("Your wager")) {
         messageType = 'you';
       } else if (logEntry.includes("The enemy wagered")) {
         messageType = 'enemy';
@@ -830,6 +1127,10 @@
       
       document.getElementById("timer").classList.remove("red");
 
+      // Reset emojis
+      document.getElementById("player-emoji").innerText = "🙂";
+      document.getElementById("enemy-emoji").innerText = "🙂";
+
       minWager = 10;
       maxWager = 200;
       document.getElementById("wager-limits").innerText =
@@ -870,4 +1171,4 @@
     }
   </script>
 </body>
-</html
+</html>
