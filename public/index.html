@@ -27,7 +27,7 @@
     .status-container {
       display: flex;
       align-items: flex-start;
-      margin-bottom: 60px; /* Increased to make room for labels */
+      margin-bottom: 20px; /* Increased to make room for labels */
       justify-content: center;
     }
 
@@ -502,13 +502,60 @@
     let heartbeatInterval = null;
     let lastServerTimestamp = null;
     let lastLogEntryRound = null;
+    
+    // Check for player parameter in URL to override session
+    const urlParams = new URLSearchParams(window.location.search);
+    const forcePlayer = urlParams.get('player');
+    let sessionId;
+    
+    if (forcePlayer) {
+      // Use forced player ID from URL parameter
+      sessionId = 'player-' + forcePlayer;
+      localStorage.setItem('greedyGameSessionId', sessionId);
+      console.log(`Using forced player ID: ${sessionId}`);
+    } else {
+      // Use stored session ID
+      sessionId = localStorage.getItem('greedyGameSessionId');
+      console.log(`Using stored session ID: ${sessionId}`);
+    }
 
     socket.on('connect', () => {
       startHeartbeat();
+      console.log("Connected to server, socket ID:", socket.id);
+      
+      // Check if we have a session ID to reconnect with
+      socket.emit('check_session', sessionId);
     });
 
     socket.on('connect_error', () => {
-      // Error handling if needed
+      console.log("Connection error");
+    });
+
+    // Add these new event handlers
+    socket.on('session_assigned', (data) => {
+      // Store the session ID for reconnection
+      sessionId = data.sessionId;
+      localStorage.setItem('greedyGameSessionId', sessionId);
+      console.log("Assigned session ID:", sessionId);
+    });
+
+    socket.on('reconnect_successful', (data) => {
+      // Update local state with reconnection data
+      playerId = data.playerId;
+      currentGameId = data.gameId;
+      const playerUnits = document.getElementById("player-units");
+      playerUnits.innerText = data.units;
+      console.log("Reconnection successful, player ID:", playerId);
+      
+      // Show a reconnection message
+      addToGameLog("Successfully reconnected to your game", "system");
+      
+      // Request current game state
+      socket.emit("request_game_state");
+    });
+
+    socket.on('opponent_reconnected', () => {
+      addToGameLog("Your opponent has reconnected", "system");
     });
 
     // Function to add an entry to the game log with appropriate styling
@@ -720,30 +767,30 @@
     }
 
     function getEmojiForUnits(units) {
-      // Precise ranges for each emoji state
-      if (units <= 20) return "💀"; // Dead (0-20)
-      if (units <= 30) return "😱"; // Terrified (21-30)
-      if (units <= 40) return "😨"; // Fearful (31-40)
-      if (units <= 60) return "😰"; // Anxious (41-60)
-      if (units <= 80) return "😢"; // Crying (61-80)
-      if (units <= 100) return "😠"; // Angry (81-100)
-      if (units <= 120) return "😟"; // Worried (101-120)
-      if (units <= 140) return "😖"; // Confounded (121-140)
-      if (units <= 160) return "😔"; // Sad (141-160)
-      if (units <= 180) return "😒"; // Unamused (161-180)
-      if (units <= 199) return "😐"; // Neutral (181-199)
-      if (units <= 210) return "🙂"; // Slightly happy (200-210)
-      if (units <= 230) return "😊"; // Happy (211-230)
-      if (units <= 240) return "😁"; // Very happy (231-240)      
-      if (units <= 260) return "😄"; // Grinning (241-260)
-      if (units <= 280) return "😏"; // Smirking (261-280)
-      if (units <= 300) return "😎"; // Cool (281-300)
-      if (units <= 320) return "😏"; // Smirking (301-320)
-      if (units <= 340) return "😜"; // Winking (321-340)
-      if (units <= 360) return "🤣"; // Laughing (341-360)
-      if (units <= 380) return "🤑"; // Money face (361-380)
-      return "🥳"; // Party face (381+)
-    }
+  // Precise ranges for each emoji state
+  if (units <= 19) return "💀"; // Dead (0-19)
+  if (units <= 30) return "😱"; // Terrified (20-30)
+  if (units <= 40) return "😭"; // Loudly crying (31-40)
+  if (units <= 60) return "😨"; // Fearful (41-60)
+  if (units <= 80) return "😰"; // Anxious (61-80)
+  if (units <= 100) return "😢"; // Crying (81-100)
+  if (units <= 120) return "😠"; // Angry (101-120)
+  if (units <= 140) return "😟"; // Worried (121-140)
+  if (units <= 160) return "😔"; // Sad (141-160)
+  if (units <= 180) return "😒"; // Unamused (161-180)
+  if (units <= 199) return "😐"; // Neutral (181-199)
+  if (units <= 210) return "🙂"; // Slightly happy (200-210)
+  if (units <= 230) return "😊"; // Happy (211-230)
+  if (units <= 240) return "😏"; // Smirking (231-240)    
+  if (units <= 260) return "😄"; // Grinning (241-260)
+  if (units <= 280) return "😁"; // Very Happy (261-280)
+  if (units <= 300) return "😎"; // Cool (281-300)
+  if (units <= 320) return "😝"; // Squinting (301-320)
+  if (units <= 340) return "😜"; // Winking (321-340)
+  if (units <= 360) return "🤣"; // Laughing (341-360)
+  if (units <= 380) return "🤑"; // Money face (361-380)
+  return "🥳"; // Party face (381+)
+}
 
     // Function to interpolate between two RGB colors
     function interpolateColor(color1, color2, factor) {
@@ -831,7 +878,10 @@
       placeWagerButton.style.display = "block";
       placeWagerButton.disabled = true;
 
-      socket.emit("place_wager", currentWager);
+      // Log the wager in the console
+      console.log(`Sending wager: ${currentWager}`);
+      
+            socket.emit("place_wager", currentWager);
     }
 
     // Function to handle game over state
@@ -938,10 +988,41 @@
       addToGameLog("Game cleaned up due to inactivity", "system");
     });
 
+    // Handle request_game_state response
+    socket.on("game_state_update", (data) => {
+      // Update the game state with the latest information from the server
+      if (data.roundNumber) {
+        roundNumber = data.roundNumber;
+        updateWagerDisplay();
+      }
+      
+      if (data.units) {
+        document.getElementById("player-units").innerText = data.units[playerId] || "200";
+        document.getElementById("enemy-units").innerText = data.units[opponentId] || "200";
+        document.getElementById("player-bar").style.width = `${(data.units[playerId] / 400) * 100}%`;
+        
+        updateColors(data.units[playerId]);
+        updateEmojis(data.units[playerId], data.units[opponentId]);
+      }
+      
+      // Update game status
+      if (data.isGameOver) {
+        isGameOver = true;
+      }
+      
+      // Enable/disable wager input
+      if (data.canPlaceWager) {
+        document.getElementById("place-wager-button").disabled = false;
+      } else {
+        document.getElementById("place-wager-button").disabled = true;
+      }
+    });
+
     // Handle assign_name event
     socket.on("assign_name", (data) => {
       // Removed player name display - no longer needed
       playerId = data.id;
+      console.log("Assigned player ID:", playerId);
     });
 
     // Handle game_ready event
@@ -949,6 +1030,7 @@
       const opponentKey = Object.keys(data.players).find(key => key !== playerId);
       opponentId = opponentKey;
       document.getElementById("place-wager-button").disabled = false;
+      console.log("Game ready, opponent ID:", opponentId);
       
       // Add system message to game log
       addToGameLog("Game ready! You can now place your wager.", "system");
@@ -977,15 +1059,19 @@
       handleClientGameOver(data.endMessage);
     });
 
-    // Handle waiting message
-    socket.on("waiting_message", (message) => {
-      document.getElementById("round-and-wager").innerText = message;
-      document.getElementById("round-and-wager").style.color = "red";
-      document.getElementById("round-and-wager").style.animation = "messageWaitingPulse 1s infinite";
-      
-      // Add message to game log
-      addToGameLog(message, "system");
-    });
+    // Replace the current waiting_message handler with this one:
+
+socket.on("waiting_message", (message) => {
+  // Update the round-and-wager display with the message
+  document.getElementById("round-and-wager").innerText = message;
+  document.getElementById("round-and-wager").style.color = "#00008B"; // Dark blue instead of red
+  
+  // Only add certain messages to the game log (excluding wager-waiting messages)
+  if (!message.includes("waiting for") && !message.includes("Waiting for") && 
+      !message.includes("place their wager") && !message.includes("to join")) {
+    addToGameLog(message, "system");
+  }
+});
 
     // Handle opponent_locked_wager event - no longer adding to game log
     socket.on("opponent_locked_wager", () => {
@@ -1169,6 +1255,24 @@
       socket.emit("reset_game");
       addToGameLog("Requesting game reset...", "system");
     }
+    
+    // Add new event handlers for error messages
+    socket.on("invalid_wager", (message) => {
+      alert(message);
+      
+      // Reset the UI
+      const keypad = document.getElementById("keypad");
+      keypad.style.display = "none";
+      
+      const placeWagerButton = document.getElementById("place-wager-button");
+      placeWagerButton.innerText = "Place Wager";
+      placeWagerButton.style.display = "block";
+      placeWagerButton.disabled = false;
+    });
+
+    socket.on("error_message", (message) => {
+      alert(message);
+    });
   </script>
 </body>
 </html>

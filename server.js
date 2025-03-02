@@ -22,7 +22,7 @@ server.listen(PORT, () => {
 });
 
 app.get('/', (req, res) => {
-  res.send('Hello World!');
+  res.sendFile(__dirname + '/public/index.html');
 });
 
 const playerSlots = [null, null];
@@ -40,6 +40,21 @@ let timerState = {
   timeRemaining: 60, // Changed to 60 seconds
   gameId: null
 };
+const playerSessionMap = {}; // Maps session IDs to player IDs
+
+// Debug function to print the current game state
+function logGameState() {
+  console.log("\n=== GAME STATE ===");
+  console.log("Player Slots:", playerSlots);
+  console.log("Players:", Object.keys(players).map(id => `${id}: ${players[id].name}, units: ${players[id].units}, wager: ${players[id].wager}`));
+  console.log("Session Map:", playerSessionMap);
+  console.log("Round:", roundNumber);
+  console.log("Game Over:", isGameOver);
+  console.log("=================\n");
+}
+
+// Call this periodically or after major events
+setInterval(logGameState, 10000); // Log every 10 seconds
 
 function cleanupGame() {
   clearInterval(timerInterval);
@@ -88,40 +103,135 @@ io.on("connection", (socket) => {
     lastHeartbeat = Date.now();
   });
 
-  let assignedSlot = null;
-  if (!playerSlots[0]) {
-    assignedSlot = 0;
-    playerSlots[0] = socket.id;
-    players[socket.id] = { name: "Player 1", units: 200, wager: null };
-    socket.emit("assign_name", { id: socket.id }); // Removed name field
-    console.log("Player 1 has joined the game.");
-  } else if (!playerSlots[1]) {
-    assignedSlot = 1;
-    playerSlots[1] = socket.id;
-    players[socket.id] = { name: "Player 2", units: 200, wager: null };
-    socket.emit("assign_name", { id: socket.id }); // Removed name field
-    console.log("Player 2 has joined the game.");
-  } else {
-    socket.emit("error_message", "The game already has two players.");
-    socket.disconnect();
-    return;
+  // Check if this is a returning player
+  socket.on("check_session", (sessionId) => {
+    console.log(`Player ${socket.id} checking session: ${sessionId}`);
+    const playerId = playerSessionMap[sessionId];
+    
+    if (playerId && players[playerId]) {
+      // This is a returning player, reassign their socket
+      const slotIndex = playerSlots.indexOf(playerId);
+      
+      if (slotIndex !== -1) {
+        console.log(`Player ${playerId} reconnecting as ${socket.id}, slot: ${slotIndex}`);
+        // Remove old socket ID from player slots
+        playerSlots[slotIndex] = socket.id;
+        
+        // Copy player data to new socket ID
+        players[socket.id] = players[playerId];
+        delete players[playerId];
+        
+        // Update session mapping
+        playerSessionMap[sessionId] = socket.id;
+        
+        // Send game state to reconnected player
+        socket.emit("reconnect_successful", {
+          gameId: currentGameId,
+          playerId: socket.id,
+          units: players[socket.id].units,
+          roundNumber: roundNumber
+        });
+        
+        // Notify opponent of reconnection
+        const opponentId = playerSlots.find(id => id !== socket.id);
+        if (opponentId) {
+          io.to(opponentId).emit("opponent_reconnected");
+        }
+        
+        console.log(`Player ${playerId} reconnected as ${socket.id}`);
+        logGameState();
+        return;
+      }
+    }
+    
+    // If we get here, it's a new player or the game state was lost
+    console.log(`Assigning new player for session: ${sessionId}`);
+    assignNewPlayer(socket, sessionId);
+    logGameState();
+  });
+
+  function assignNewPlayer(socket, sessionId) {
+    // If the sessionId starts with 'player-', use it to determine the player number
+    let forcedSlot = null;
+    if (sessionId && sessionId.startsWith('player-')) {
+      const playerNum = sessionId.split('-')[1];
+      if (playerNum === '1' && !playerSlots[0]) {
+        forcedSlot = 0;
+      } else if (playerNum === '2' && !playerSlots[1]) {
+        forcedSlot = 1;
+      }
+      console.log(`Forced slot assignment: player-${playerNum} → slot ${forcedSlot}`);
+    }
+
+    let assignedSlot = null;
+    if (forcedSlot === 0 || (!playerSlots[0] && forcedSlot !== 1)) {
+      assignedSlot = 0;
+      playerSlots[0] = socket.id;
+      players[socket.id] = { name: "Player 1", units: 200, wager: null };
+      
+      // Store session mapping
+      if (sessionId) {
+        playerSessionMap[sessionId] = socket.id;
+      }
+      
+      socket.emit("assign_name", { id: socket.id });
+      console.log("Player 1 has joined the game.");
+    } else if (forcedSlot === 1 || (!playerSlots[1] && forcedSlot !== 0)) {
+      assignedSlot = 1;
+      playerSlots[1] = socket.id;
+      players[socket.id] = { name: "Player 2", units: 200, wager: null };
+      
+      // Store session mapping
+      if (sessionId) {
+        playerSessionMap[sessionId] = socket.id;
+      }
+      
+      socket.emit("assign_name", { id: socket.id });
+      console.log("Player 2 has joined the game.");
+    } else {
+      socket.emit("error_message", "The game already has two players.");
+      socket.disconnect();
+      return;
+    }
+
+    // Send info about assigned session
+    socket.emit("session_assigned", { sessionId: sessionId || generateSessionId() });
+
+    io.emit("player_joined", { id: socket.id, name: players[socket.id].name });
+
+    if (playerSlots[0] && playerSlots[1]) {
+      console.log("Two players are ready. Game can start!");
+      io.emit("game_ready", {
+        players: {
+          [playerSlots[0]]: players[playerSlots[0]],
+          [playerSlots[1]]: players[playerSlots[1]],
+        },
+      });
+      io.emit("update_round", roundNumber + 1);
+      startTimer();
+    }
   }
 
-  io.emit("player_joined", { id: socket.id, name: players[socket.id].name });
-
-  if (playerSlots[0] && playerSlots[1]) {
-    console.log("Two players are ready. Game can start!");
-    io.emit("game_ready", {
-      players: {
-        [playerSlots[0]]: players[playerSlots[0]],
-        [playerSlots[1]]: players[playerSlots[1]],
+  // Handle game state request from reconnecting player
+  socket.on("request_game_state", () => {
+    if (!players[socket.id]) return;
+    
+    const opponentId = playerSlots.find(id => id !== socket.id && id !== null);
+    
+    socket.emit("game_state_update", {
+      roundNumber: roundNumber + 1,
+      units: {
+        [socket.id]: players[socket.id].units,
+        [opponentId]: opponentId ? players[opponentId].units : 200
       },
+      isGameOver: isGameOver,
+      canPlaceWager: !isGameOver && players[socket.id].wager === null
     });
-    io.emit("update_round", roundNumber + 1);
-    startTimer();
-  }
+  });
 
   socket.on("place_wager", (wager) => {
+    console.log(`Received wager: ${wager} from player ${socket.id}`);
+    
     if (isGameOver) {
       socket.emit("error_message", "The game has ended. Please start a new game.");
       return;
@@ -141,15 +251,33 @@ io.on("connection", (socket) => {
     player.wager = wager;
     console.log(`${player.name} placed a wager of ${wager} units.`);
 
-    const opponentId = playerSlots.find(id => id !== socket.id);
-    if (opponentId) {
+    const opponentId = playerSlots.find(id => id !== socket.id && id !== null);
+    if (opponentId && players[opponentId]) {
       io.to(opponentId).emit("opponent_locked_wager");
     }
 
+    // Log the current player slots and wagers for debugging
+    console.log("Current player slots:", playerSlots);
+    console.log("Player wagers:", 
+      playerSlots[0] ? `Player 1 (${playerSlots[0]}): ${players[playerSlots[0]]?.wager}` : "Player 1: None",
+      playerSlots[1] ? `Player 2 (${playerSlots[1]}): ${players[playerSlots[1]]?.wager}` : "Player 2: None"
+    );
+
     const [p1Id, p2Id] = playerSlots;
-    if (players[p1Id]?.wager !== null && players[p2Id]?.wager !== null) {
+    
+    // Only calculate winner if both players exist and both have placed wagers
+    if (p1Id && p2Id && players[p1Id] && players[p2Id] && 
+        players[p1Id].wager !== null && players[p2Id].wager !== null) {
+      console.log("Both players have wagered, calculating winner...");
       clearInterval(timerInterval);
       calculateRoundWinner(p1Id, p2Id);
+    } else {
+      // Let the player know we're waiting for an opponent
+      if (!opponentId || !players[opponentId]) {
+        socket.emit("waiting_message", "Waiting for another player to join...");
+      } else if (players[opponentId] && players[opponentId].wager === null) {
+        socket.emit("waiting_message", "Waiting for the enemy to place their wager...");
+      }
     }
   });
 
@@ -159,11 +287,15 @@ io.on("connection", (socket) => {
     const [p1Id, p2Id] = playerSlots;
     const currentPlayer = players[socket.id];
     const otherPlayerId = socket.id === p1Id ? p2Id : p1Id;
-    const otherPlayer = players[otherPlayerId];
-
-    if (playerReady.size === 1) {
-      io.to(socket.id).emit("waiting_message", `Waiting for the enemy to get back in the game`);
-      io.to(otherPlayerId).emit("waiting_message", `The enemy is waiting for you to get back in the game`);
+    
+    // Check if the other player exists
+    if (otherPlayerId && players[otherPlayerId]) {
+      if (playerReady.size === 1) {
+        io.to(socket.id).emit("waiting_message", `Waiting for the enemy to get back in the game`);
+        io.to(otherPlayerId).emit("waiting_message", `The enemy is waiting for you to get back in the game`);
+      }
+    } else {
+      socket.emit("waiting_message", "Waiting for another player to join...");
     }
 
     if (playerReady.size === 2) {
@@ -173,16 +305,28 @@ io.on("connection", (socket) => {
 
   socket.on("disconnect", () => {
     console.log(`${players[socket.id]?.name || "A player"} disconnected.`);
-    const slotIndex = playerSlots.indexOf(socket.id);
-    if (slotIndex !== -1) {
-      playerSlots[slotIndex] = null;
-      delete players[socket.id];
-      playerReady.delete(socket.id);
-      
-      if (!playerSlots[0] && !playerSlots[1]) {
-        cleanupGame();
+    
+    // We don't immediately remove the player to allow for reconnection
+    // Instead, we set a timeout to clean up if they don't reconnect
+    setTimeout(() => {
+      const slotIndex = playerSlots.indexOf(socket.id);
+      if (slotIndex !== -1 && playerSlots[slotIndex] === socket.id) {
+        playerSlots[slotIndex] = null;
+        delete players[socket.id];
+        playerReady.delete(socket.id);
+        
+        // Remove from session map (find key by value)
+        Object.keys(playerSessionMap).forEach(sessionId => {
+          if (playerSessionMap[sessionId] === socket.id) {
+            delete playerSessionMap[sessionId];
+          }
+        });
+        
+        if (!playerSlots[0] && !playerSlots[1]) {
+          cleanupGame();
+        }
       }
-    }
+    }, 120000); // 2 minutes to reconnect
   });
 });
 
@@ -223,10 +367,19 @@ function startTimer() {
 
 function handleTimeout() {
   const [p1Id, p2Id] = playerSlots;
+  
+  // Safety check - make sure both players exist
+  if (!p1Id || !p2Id || !players[p1Id] || !players[p2Id]) {
+    console.log("Can't handle timeout - one or both players missing");
+    // Restart the timer if the game isn't over
+    if (!isGameOver) {
+      startTimer();
+    }
+    return;
+  }
+  
   const p1 = players[p1Id];
   const p2 = players[p2Id];
-
-  if (!p1 || !p2) return;
 
   roundNumber++;
 
@@ -431,6 +584,12 @@ function handleGameOver(winnerId) {
   const p1Id = playerSlots[0];
   const p2Id = playerSlots[1];
 
+  // Safety check - make sure players exist
+  if (!p1Id || !p2Id || !players[p1Id] || !players[p2Id]) {
+    console.log("Can't handle game over - one or both players missing");
+    return;
+  }
+
   clearInterval(timerInterval);
   clearTimeout(gameInactivityTimeout);
   timerState.isRunning = false;
@@ -459,6 +618,12 @@ function handleGameOver(winnerId) {
 }
 
 function calculateRoundWinner(player1Id, player2Id) {
+  // Safety check - make sure both players exist
+  if (!players[player1Id] || !players[player2Id]) {
+    console.log("Can't calculate round winner - one or both players missing");
+    return;
+  }
+
   const p1 = players[player1Id];
   const p2 = players[player2Id];
   roundNumber++;
@@ -627,4 +792,9 @@ function calculateRoundWinner(player1Id, player2Id) {
   } else {
     startTimer();
   }
+}
+
+// Helper function to generate a session ID
+function generateSessionId() {
+  return Date.now().toString() + Math.random().toString(36).substring(2, 15);
 }
