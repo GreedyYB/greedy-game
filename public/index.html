@@ -682,8 +682,8 @@
           "That was a huge win!",
           "Awesome win!",
           "Wow! Great play!",
-          "You've got the enemy figured out now!",
-          "Slow and steady wins the race."
+          "Great timing for that wager!",
+          "Are you a mind reader?."
         ];
         
         // Specific messages for the loser
@@ -691,9 +691,9 @@
           "The greedy get needy!",
           "OUCH! That's going to leave mark.",
           "A swing and a miss!",
-          "Oh well, you gave it a shot.",
+          "Big bets can go wrong...",
           "Why so much?",
-          "Are you sure you know what you're doing?"
+          "Are you trying to lose?"
         ];
         
         // Choose the appropriate message list based on whether the current player is the winner
@@ -710,10 +710,10 @@
       if (p1Wager === p2Wager && p1Wager > 0) {
         const tieMessages = [
           "Great minds think alike!",
-          "Jinx! You both thought the same thing!",
-          "What are the odds? Perfect match!",
+          "Jinx!",
+          "Perfect match!",
           "Are you two sharing notes?",
-          "Synchronized wagering! Olympic-level stuff!"
+          "Synchronized wagering!"
         ];
         
         const randomIndex = Math.floor(Math.random() * tieMessages.length);

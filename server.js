@@ -523,9 +523,7 @@ function handleTimeout() {
     return;
   }
 
-  io.to(p1Id).emit("update_game_log", logEntryP1);
-  io.to(p2Id).emit("update_game_log", logEntryP2);
-
+  
   if (timedOutPlayer && winningPlayer) {
     // Calculate how many units the timedOutPlayer can actually lose
     const maxPossibleLoss = timedOutPlayer.units;
@@ -542,29 +540,27 @@ function handleTimeout() {
       logEntryP2 += transferNote;
     }
     
+    // For timeout events, we need to add a special timeout message
+    const specialEvent = {
+      p1Wager: p1.wager !== null ? p1.wager : 0,
+      p2Wager: p2.wager !== null ? p2.wager : 0,
+      winner: winningPlayer === p1 ? p1Id : p2Id,
+      logNote: "timeout" + (transferNote ? " and" + transferNote : "")
+    };
+    
     io.to(p1Id).emit("round_result", {
       units: { [p1Id]: p1.units, [p2Id]: p2.units },
       logEntry: logEntryP1,
       isDraw: false,
       roundNumber: roundNumber,
-      specialEvent: {
-        p1Wager: p1.wager !== null ? p1.wager : 0,
-        p2Wager: p2.wager !== null ? p2.wager : 0,
-        winner: winningPlayer === p1 ? p1Id : p2Id,
-        logNote: "timeout"
-      }
+      specialEvent: specialEvent
     });
     io.to(p2Id).emit("round_result", {
       units: { [p1Id]: p1.units, [p2Id]: p2.units },
       logEntry: logEntryP2,
       isDraw: false,
       roundNumber: roundNumber,
-      specialEvent: {
-        p1Wager: p1.wager !== null ? p1.wager : 0,
-        p2Wager: p2.wager !== null ? p2.wager : 0,
-        winner: winningPlayer === p1 ? p1Id : p2Id,
-        logNote: "timeout"
-      }
+      specialEvent: specialEvent
     });
   }
 
@@ -596,10 +592,10 @@ function handleGameOver(winnerId) {
   
   if (winnerId === p1Id) {
     io.to(p1Id).emit("game_over", { endMessage: "Congratulations, you won!" });
-    io.to(p2Id).emit("game_over", { endMessage: "Game over, you lost." });
+    io.to(p2Id).emit("game_over", { endMessage: "You lost." });
   } else if (winnerId === p2Id) {
     io.to(p2Id).emit("game_over", { endMessage: "Congratulations, you won!" });
-    io.to(p1Id).emit("game_over", { endMessage: "Game over, you lost." });
+    io.to(p1Id).emit("game_over", { endMessage: "You lost." });
   } else {
     io.emit("game_over", { endMessage: "Game over, it's a draw!" });
   }
